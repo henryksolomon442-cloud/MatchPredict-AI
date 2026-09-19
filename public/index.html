@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#090b0f">
+<title>MatchPredict AI</title>
+<style>
+:root{
+  --bg:#080a0e;--panel:#101318;--panel2:#151a20;--line:#282f38;--text:#f5f7fb;
+  --muted:#929aa6;--amber:#ffb000;--orange:#ff7a00;--green:#36d399;--red:#ff5c6c;
+  --blue:#5aa9ff;--cyan:#62d7e8;--shadow:0 22px 60px rgba(0,0,0,.30)
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:linear-gradient(180deg,#07090d,#0a0d12 55%,#080a0e);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button,input,select{font:inherit}
+button{cursor:pointer}
+a{color:inherit}
+.shell{max-width:1180px;margin:auto;padding:0 18px}
+.topbar{position:sticky;top:0;z-index:80;background:rgba(8,10,14,.90);backdrop-filter:blur(14px);border-bottom:1px solid #1f252d}
+.topbar-inner{height:68px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.02em}
+.brand-mark{width:32px;height:32px;border:1px solid #8a5b00;border-radius:9px;background:linear-gradient(145deg,#ffbf2f,#ff7600);display:grid;place-items:center;color:#101010;font-weight:1000}
+.brand-name{font-size:17px}.brand-name span{color:var(--amber)}
+.top-actions{display:flex;align-items:center;gap:9px}
+.pill,.btn{border:1px solid var(--line);border-radius:10px;background:#11161d;color:var(--text);padding:10px 13px;text-decoration:none}
+.btn.primary{background:linear-gradient(90deg,#ffc400,#ff8600);color:#111;border:0;font-weight:900}
+.btn.ghost{background:#11161d}
+.btn.danger{border-color:#57242b;color:#ff8994;background:#1a1013}
+.pill{font-size:12px;color:var(--muted)}
+.mobile-menu{display:none}
+main{padding:22px 0 50px}
+.section{margin-bottom:18px}
+.card{background:linear-gradient(180deg,#11151b,#0f1217);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+.card-pad{padding:18px}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.13em;color:#a8b0bc;font-weight:800}
+h1,h2,h3,p{margin-top:0}
+.hero{display:grid;grid-template-columns:1.18fr .82fr;gap:16px;align-items:stretch}
+.hero-main{padding:28px;min-height:330px;position:relative;overflow:hidden}
+.hero-main:before{content:"";position:absolute;width:350px;height:350px;border-radius:50%;background:radial-gradient(circle,rgba(255,176,0,.16),transparent 66%);right:-80px;top:-110px}
+.hero h1{font-size:46px;line-height:1.04;margin:12px 0 12px;max-width:650px}
+.hero h1 span{color:var(--amber)}
+.hero-copy{color:var(--muted);font-size:15px;line-height:1.7;max-width:650px}
+.hero-buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.auth-card{padding:20px;display:flex;flex-direction:column;justify-content:space-between}
+.auth-state{display:flex;gap:10px;align-items:center;padding:12px;border-radius:12px;background:#0c1117;border:1px solid #232b34;margin:13px 0}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--amber);box-shadow:0 0 14px rgba(255,176,0,.35)}
+.dot.on{background:var(--green);box-shadow:0 0 14px rgba(54,211,153,.35)}
+.dot.off{background:var(--red)}
+.small{font-size:12px;color:var(--muted);line-height:1.55}
+.auth-buttons{display:grid;gap:9px}
+.templates{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.template{padding:16px;min-height:180px;display:flex;flex-direction:column;justify-content:space-between}
+.template.active{border-color:#745000;box-shadow:inset 0 0 0 1px rgba(255,176,0,.18)}
+.template-icon{width:38px;height:38px;border-radius:11px;border:1px solid #323a44;display:grid;place-items:center;background:#151b22;font-weight:900;color:var(--amber)}
+.template-title{font-size:20px;font-weight:900;margin:13px 0 5px}
+.tag{display:inline-block;padding:5px 8px;border-radius:999px;border:1px solid #333b45;background:#11171e;color:#a8b0bc;font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.dash-grid{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}
+.panel-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.panel-title h2{font-size:22px;margin:0}
+.form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px}
+select,input{width:100%;padding:11px 12px;border-radius:10px;border:1px solid #303844;background:#0b1016;color:var(--text);outline:none}
+select:focus,input:focus{border-color:#7d5b19}
+.prediction-card{text-align:center;padding:22px;border:1px solid #6c4a08;border-radius:15px;background:radial-gradient(circle at 50% 0%,rgba(255,176,0,.12),transparent 58%),#0c1015;margin-top:12px}
+.match-label{font-size:12px;letter-spacing:.13em;color:#c1a15d;text-transform:uppercase}
+.match-number{font-size:90px;line-height:1;font-weight:1000;color:#ffd05b;margin:8px 0;text-shadow:0 0 35px rgba(255,176,0,.14)}
+.match-copy{font-size:20px;font-weight:900}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:11px}
+.stat{padding:12px;border-radius:12px;background:#0b1016;border:1px solid #222a33}
+.stat-num{font-size:23px;font-weight:900;margin-top:5px}
+.digit-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:7px;margin-top:12px}
+.digit{border:1px solid #29313b;border-radius:10px;padding:10px 4px;text-align:center;background:#0c1117}
+.digit strong{font-size:20px}.digit.selected{border-color:#c4860a;background:#231a08;color:#ffd05b}
+.sequence{font-family:Consolas,ui-monospace,monospace;line-height:1.9;word-break:break-word;color:#cbd2da}
+.status{padding:11px;border-radius:11px;background:#0b1016;border:1px solid #252d36;font-size:13px}
+.status.good{color:#7ee7bd;border-color:#234a3c}.status.warn{color:#f4c96b;border-color:#594821}.status.bad{color:#ff8893;border-color:#5b252b}
+.side-stack{display:grid;gap:12px}
+.quick-action{padding:16px}
+.oneclick{background:linear-gradient(180deg,#17130b,#101318);border-color:#5e4410}
+.oneclick h3{margin:7px 0 5px;font-size:24px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #ffffff0d}
+.toggle-row:last-child{border-bottom:0}
+.switch{width:44px;height:24px;border-radius:20px;border:1px solid #39414b;background:#131820;position:relative}
+.switch:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#8b939d;left:3px;top:2px;transition:.2s}
+.switch.on{background:#4b3507;border-color:#8b620b}.switch.on:after{left:21px;background:#ffc63b}
+.history-card{overflow:hidden}
+.history-head,.history-row{display:grid;grid-template-columns:1fr .8fr .7fr .7fr;gap:10px;align-items:center;padding:12px 14px}
+.history-head{background:#0b1016;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.history-row{border-top:1px solid #1f252d;font-size:13px}
+.win{color:var(--green);font-weight:800}.loss{color:var(--red);font-weight:800}
+.progress{height:6px;background:#202731;border-radius:999px;overflow:hidden;margin-top:8px}
+.progress > div{height:100%;background:linear-gradient(90deg,#36d399,#53f0b3);width:0}
+.plan-card{background:linear-gradient(145deg,#14100a,#11151b);border-color:#604812}
+.plan-line{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.price-card{padding:18px}
+.price-card.featured{border-color:#78560c;background:linear-gradient(180deg,#171208,#101318)}
+.price{font-size:34px;font-weight:1000;margin:10px 0}
+.features{display:grid;gap:8px;margin:14px 0;color:#c5ccd5;font-size:13px}
+.footer{text-align:center;color:#707985;padding:22px;font-size:12px}
+.hidden{display:none!important}
+@media(max-width:920px){.hero,.dash-grid{grid-template-columns:1fr}.templates{grid-template-columns:repeat(2,1fr)}.price-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:620px){.shell{padding:0 12px}.top-actions .pill{display:none}.hero-main{padding:20px}.hero h1{font-size:34px}.templates{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.digit-grid{grid-template-columns:repeat(5,1fr)}.history-head,.history-row{grid-template-columns:1fr .7fr .7fr}.history-head div:nth-child(2),.history-row div:nth-child(2){display:none}.match-number{font-size:72px}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="shell topbar-inner">
+    <div class="brand"><div class="brand-mark">M</div><div class="brand-name">MATCH<span>PREDICT</span> AI</div></div>
+    <div class="top-actions">
+      <div class="pill" id="topMode">PUBLIC MODE</div>
+      <a class="btn ghost" href="#pricing">PRICING</a>
+      <a class="btn ghost" href="#dashboard">DASHBOARD</a>
+    </div>
+  </div>
+</div>
+
+<main class="shell">
+  <section class="hero section" id="home">
+    <div class="card hero-main">
+      <div class="eyebrow">AI MARKET TOOLS · DIGITS</div>
+      <h1>One dashboard for <span>Match Number</span> analysis.</h1>
+      <p class="hero-copy">
+        A full trading-style platform experience built around Deriv public tick analysis:
+        opening dashboard, authentication, Digits templates, live Match candidate,
+        one-click paper testing, trade history and performance tracking.
+      </p>
+      <div class="hero-buttons">
+        <a class="btn primary" href="#dashboard">OPEN TRADING DASHBOARD</a>
+        <a class="btn ghost" href="#templates">VIEW TEMPLATES</a>
+      </div>
+    </div>
+
+    <div class="card auth-card">
+      <div>
+        <div class="eyebrow">DERIV AUTHENTICATION</div>
+        <h2 style="margin:8px 0 6px">Connect securely</h2>
+        <div class="small">Users sign in on Deriv’s own page. MatchPredict AI never asks them to type a Deriv password into this dashboard.</div>
+
+        <div class="auth-state">
+          <div class="dot" id="authDot"></div>
+          <div>
+            <div style="font-weight:800" id="authTitle">Checking login status…</div>
+            <div class="small" id="authDetail">Public scanner is available without login.</div>
+          </div>
+        </div>
+        <div class="small" id="accountSummary"></div>
+      </div>
+
+      <div class="auth-buttons">
+        <a class="btn primary" id="derivLogin" href="/auth/deriv/start" style="text-align:center">LOGIN WITH DERIV</a>
+        <button class="btn ghost" id="publicMode">CONTINUE WITH PUBLIC SCANNER</button>
+        <button class="btn danger hidden" id="logoutBtn">LOG OUT</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="templates">
+    <div class="panel-title">
+      <div>
+        <div class="eyebrow">TOOLS & TEMPLATES</div>
+        <h2 style="margin-top:5px">Choose a strategy workspace</h2>
+      </div>
+      <div class="tag">Digits active</div>
+    </div>
+
+    <div class="templates">
+      <div class="card template active">
+        <div>
+          <div class="template-icon">09</div>
+          <div class="template-title">Digits</div>
+          <div class="small">Match Number ranking, digit distribution, live tick feed and forward paper testing.</div>
+        </div>
+        <a href="#dashboard" class="btn primary" style="text-align:center;margin-top:14px">OPEN DIGITS</a>
+      </div>
+
+      <div class="card template">
+        <div>
+          <div class="template-icon">M/D</div>
+          <div class="template-title">Matches / Differs</div>
+          <div class="small">Contract-style workflow prepared for a later authenticated demo execution module.</div>
+        </div>
+        <span class="tag">Planned</span>
+      </div>
+
+      <div class="card template">
+        <div>
+          <div class="template-icon">E/O</div>
+          <div class="template-title">Even / Odd</div>
+          <div class="small">Future parity analysis using the same live public tick stream.</div>
+        </div>
+        <span class="tag">Planned</span>
+      </div>
+
+      <div class="card template">
+        <div>
+          <div class="template-icon">O/U</div>
+          <div class="template-title">Over / Under</div>
+          <div class="small">Future threshold analysis panel for Deriv digit contracts.</div>
+        </div>
+        <span class="tag">Planned</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="dashboard">
+    <div class="panel-title">
+      <div>
+        <div class="eyebrow">MATCHPREDICT AI</div>
+        <h2 style="margin-top:5px">Trading Dashboard</h2>
+      </div>
+      <div class="tag" id="liveBadge">CONNECTING</div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="side-stack">
+        <div class="card card-pad">
+          <div class="form-row">
+            <div>
+              <label>Market</label>
+              <select id="market"><option value="">Loading Deriv markets…</option></select>
+            </div>
+            <div>
+              <label>Analysis window</label>
+              <select id="windowSize">
+                <option value="100">100 ticks</option>
+                <option value="250" selected>250 ticks</option>
+                <option value="500">500 ticks</option>
+                <option value="1000">1000 ticks</option>
+              </select>
+            </div>
+            <div>
+              <label>Paper stake</label>
+              <input id="paperStake" type="number" value="1" min=".35" step=".01">
+            </div>
+          </div>
+
+          <div class="status warn" id="connectionStatus" style="margin-top:12px">Connecting to Deriv public market data…</div>
+
+          <div class="prediction-card">
+            <div class="match-label">AI Match Candidate</div>
+            <div class="match-number" id="prediction">—</div>
+            <div class="match-copy" id="predictionText">Waiting for market data…</div>
+            <div class="small" id="reason" style="margin-top:8px">The engine will rank digits 0–9 after live history loads.</div>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><div class="eyebrow">Ranking score</div><div class="stat-num" id="score">—</div></div>
+            <div class="stat"><div class="eyebrow">Agreement</div><div class="stat-num" id="agreement">—</div></div>
+            <div class="stat"><div class="eyebrow">Live tick</div><div class="stat-num" id="liveTick">—</div></div>
+            <div class="stat"><div class="eyebrow">Ticks used</div><div class="stat-num" id="tickCount">0</div></div>
+          </div>
+        </div>
+
+        <div class="card card-pad">
+          <div class="panel-title">
+            <div><div class="eyebrow">DIGIT RANKING</div><h3 style="margin:5px 0 0">Top Match candidates</h3></div>
+            <button class="btn ghost" id="reconnectBtn">Reconnect</button>
+          </div>
+          <div class="digit-grid" id="digitGrid"></div>
+          <div class="eyebrow" style="margin-top:18px">RECENT LAST DIGITS</div>
+          <div class="sequence" id="sequence">Waiting for ticks…</div>
+        </div>
+
+        <div class="card history-card">
+          <div class="panel-title card-pad" style="margin-bottom:0">
+            <div><div class="eyebrow">TRADE HISTORY</div><h3 style="margin:5px 0 0">Paper results</h3></div>
+            <button class="btn ghost" id="clearHistory">Clear</button>
+          </div>
+          <div class="history-head"><div>Time</div><div>Market</div><div>Match</div><div>Result</div></div>
+          <div id="historyBody"><div class="history-row"><div class="small">No paper trades yet.</div><div></div><div></div><div></div></div></div>
+        </div>
+      </div>
+
+      <div class="side-stack">
+        <div class="card quick-action oneclick">
+          <div class="eyebrow">ONE-CLICK ENGINE</div>
+          <h3>Paper execution</h3>
+          <div class="small">Test the current Match candidate against the next live tick without placing a real Deriv trade.</div>
+
+          <div class="toggle-row"><span>Auto paper mode</span><button class="switch" id="autoSwitch" aria-label="Auto paper mode"></button></div>
+          <div class="toggle-row"><span>Require 3/4 model agreement</span><button class="switch on" id="agreementSwitch" aria-label="Agreement filter"></button></div>
+          <div class="toggle-row"><span>Cooldown after result</span><span class="tag">1 tick</span></div>
+
+          <button class="btn primary" id="paperBtn" style="width:100%;margin-top:14px">TEST CURRENT MATCH</button>
+          <div class="status" id="paperStatus" style="margin-top:10px">No paper test running.</div>
+        </div>
+
+        <div class="card card-pad">
+          <div class="eyebrow">SESSION PERFORMANCE</div>
+          <div class="stats" style="grid-template-columns:1fr 1fr;margin-top:10px">
+            <div class="stat"><div class="eyebrow">Tests</div><div class="stat-num" id="sessionTrades">0</div></div>
+            <div class="stat"><div class="eyebrow">Wins</div><div class="stat-num" id="sessionWins">0</div></div>
+            <div class="stat"><div class="eyebrow">Losses</div><div class="stat-num" id="sessionLosses">0</div></div>
+            <div class="stat"><div class="eyebrow">Hit rate</div><div class="stat-num" id="sessionRate">0%</div></div>
+          </div>
+          <div class="progress"><div id="winBar"></div></div>
+          <div class="small" style="margin-top:8px">Performance shown here is from paper tests in this browser session.</div>
+        </div>
+
+        <div class="card card-pad plan-card">
+          <div class="plan-line">
+            <div>
+              <div class="eyebrow">ACTIVE PLAN</div>
+              <h3 style="margin:5px 0 0">Free Research</h3>
+            </div>
+            <span class="tag">ACTIVE</span>
+          </div>
+          <div class="features">
+            <div>✓ Public Deriv live ticks</div>
+            <div>✓ Match Number ranking</div>
+            <div>✓ Paper testing</div>
+            <div>✓ Session history</div>
+          </div>
+          <a href="#pricing" class="btn ghost" style="text-align:center;display:block">MANAGE PLAN</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="pricing">
+    <div class="panel-title">
+      <div><div class="eyebrow">ACCESS</div><h2 style="margin-top:5px">Plans</h2></div>
+      <div class="tag">No payment integration yet</div>
+    </div>
+    <div class="price-grid">
+      <div class="card price-card featured">
+        <div class="eyebrow">CURRENT</div>
+        <h3 style="margin:7px 0 0">Free Research</h3>
+        <div class="price">$0</div>
+        <div class="features">
+          <div>✓ Live public scanner</div><div>✓ Match candidate</div><div>✓ Paper tests</div><div>✓ History & performance</div>
+        </div>
+        <button class="btn primary" style="width:100%">ACTIVE</button>
+      </div>
+      <div class="card price-card">
+        <div class="eyebrow">PLANNED</div>
+        <h3 style="margin:7px 0 0">Demo Pro</h3>
+        <div class="price">Later</div>
+        <div class="features">
+          <div>• Authenticated demo account</div><div>• Demo contract execution</div><div>• Advanced analytics</div><div>• Persistent reports</div>
+        </div>
+        <button class="btn ghost" style="width:100%" disabled>COMING LATER</button>
+      </div>
+      <div class="card price-card">
+        <div class="eyebrow">PLANNED</div>
+        <h3 style="margin:7px 0 0">Strategy Lab</h3>
+        <div class="price">Later</div>
+        <div class="features">
+          <div>• Multiple strategy models</div><div>• Backtest comparisons</div><div>• Market ranking</div><div>• Exportable analytics</div>
+        </div>
+        <button class="btn ghost" style="width:100%" disabled>COMING LATER</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">
+    MatchPredict AI is an independent research interface. Model rankings and paper-test results do not guarantee future outcomes.
+  </div>
+</main>
+
+<script>
+const WS_URL="wss://api.derivws.com/trading/v1/options/ws/public";
+const $=id=>document.getElementById(id);
+let ws=null, reqId=1, symbols=[], ticks=[], pip=null, subId=null;
+let prediction=null, analysis=null, paperPending=null, paperHistory=[];
+let autoPaper=false, requireAgreement=true, cooldown=false, reconnectTimer=null;
+
+function send(obj){
+  if(!ws||ws.readyState!==WebSocket.OPEN)return false;
+  ws.send(JSON.stringify({...obj,req_id:reqId++}));
+  return true;
+}
+function setStatus(text,type="warn"){
+  const e=$("connectionStatus"); e.textContent=text; e.className="status "+type;
+  $("liveBadge").textContent=type==="good"?"LIVE":type==="bad"?"OFFLINE":"CONNECTING";
+}
+function digitFromQuote(q,p){
+  if(q===undefined||q===null)return null;
+  let s=Number.isFinite(Number(p))?Number(q).toFixed(Number(p)):String(q);
+  const d=s.replace(/\D/g,"");
+  return d?Number(d.slice(-1)):null;
+}
+function argmax(a){let b=0;for(let i=1;i<a.length;i++)if(a[i]>a[b])b=i;return b}
+function normalize(a){const s=a.reduce((x,y)=>x+y,0);return s?a.map(x=>x/s):a.map(()=>.1)}
+function entropy(counts,n){if(!n)return 0;let h=0;for(const c of counts){if(!c)continue;const p=c/n;h-=p*Math.log2(p)}return h}
+
+function analyse(data){
+  const n=data.length;if(n<30)return null;
+  const counts=Array(10).fill(0),recent=Array(10).fill(0),lastSeen=Array(10).fill(-1);
+  const trans=Array.from({length:10},()=>Array(10).fill(0));
+  const recentData=data.slice(-Math.min(80,n));
+  data.forEach((d,i)=>{counts[d]++;lastSeen[d]=i;if(i)trans[data[i-1]][d]++});
+  recentData.forEach(d=>recent[d]++);
+  const freq=counts.map(c=>c/n),rf=recent.map(c=>c/recentData.length);
+  const rec=lastSeen.map(i=>Math.exp(-(n-1-i)/Math.max(7,Math.sqrt(n))));
+  const prev=data[n-1],row=trans[prev].reduce((a,b)=>a+b,0);
+  const tr=row?trans[prev].map(c=>c/row):Array(10).fill(.1);
+
+  const balanced=normalize(freq.map((v,d)=>.35*v+.30*rf[d]+.20*tr[d]+.15*rec[d]));
+  const recentM=normalize(rf.map((v,d)=>.65*v+.20*freq[d]+.15*tr[d]));
+  const transM=normalize(tr.map((v,d)=>.70*v+.20*rf[d]+.10*freq[d]));
+  const recM=normalize(rec.map((v,d)=>.55*v+.25*rf[d]+.20*freq[d]));
+  const models=[balanced,recentM,transM,recM],preds=models.map(argmax);
+  const votes=Array(10).fill(0);preds.forEach(d=>votes[d]++);
+  const maxVote=Math.max(...votes);
+  const tied=votes.map((v,d)=>({d,v,b:balanced[d]})).filter(x=>x.v===maxVote).sort((a,b)=>b.b-a.b);
+  const pred=tied[0].d;
+  const comp=balanced.map((v,d)=>.40*v+.25*recentM[d]+.20*transM[d]+.15*recM[d]);
+  const ranked=comp.map((score,d)=>({d,score})).sort((a,b)=>b.score-a.score);
+  return {pred,agreement:maxVote,ranked,rf,tr,rec,entropy:entropy(counts,n),preds};
+}
+
+function render(){
+  const w=+$("windowSize").value||250,data=ticks.slice(-w);
+  $("tickCount").textContent=data.length;
+  $("sequence").textContent=data.slice(-70).join(" ");
+  const a=analyse(data);analysis=a;
+  if(!a){
+    prediction=null;$("prediction").textContent="—";$("score").textContent="—";$("agreement").textContent="—";
+    $("predictionText").textContent=`Collecting data… ${data.length}/30`;
+    return;
+  }
+  prediction=a.pred;
+  $("prediction").textContent=a.pred;
+  $("predictionText").textContent=`MATCH ${a.pred}`;
+  $("score").textContent=(a.ranked.find(x=>x.d===a.pred).score*1000).toFixed(1);
+  $("agreement").textContent=`${a.agreement}/4`;
+  $("reason").textContent=`Models: ${a.preds.join(", ")} · recent ${(a.rf[a.pred]*100).toFixed(1)}% · transition ${(a.tr[a.pred]*100).toFixed(1)}% · entropy ${a.entropy.toFixed(2)}. Ranking score is not a probability.`;
+  $("digitGrid").innerHTML=a.ranked.map((x,i)=>`<div class="digit ${x.d===a.pred?"selected":""}"><strong>${x.d}</strong><div class="small">#${i+1}</div><div class="small">${(x.score*1000).toFixed(1)}</div></div>`).join("");
+}
+
+function startMarket(symbol){
+  if(!symbol||!ws||ws.readyState!==WebSocket.OPEN)return;
+  ticks=[];prediction=null;
+  const meta=symbols.find(x=>x.underlying_symbol===symbol);pip=meta?.pip_size??null;
+  if(subId){send({forget:subId});subId=null}
+  $("sequence").textContent="Loading history…";$("prediction").textContent="—";$("predictionText").textContent="Loading historical ticks…";
+  send({ticks_history:symbol,count:1000,end:"latest",style:"ticks"});
+  send({ticks:symbol,subscribe:1});
+}
+function renderMarkets(){
+  const filt=symbols.filter(s=>{
+    const n=(s.underlying_symbol_name||"").toLowerCase(),c=(s.underlying_symbol||"").toLowerCase();
+    return n.includes("volatility")||c.includes("hz")||c.includes("vol");
+  });
+  const list=filt.length?filt:symbols;
+  $("market").innerHTML=list.length?list.slice(0,120).map(s=>`<option value="${s.underlying_symbol}">${s.underlying_symbol_name||s.underlying_symbol}</option>`).join(""):'<option value="1HZ100V">Volatility 100 (1s) Index</option>';
+  startMarket($("market").value);
+}
+function handle(m){
+  if(m.error){setStatus(`Deriv error: ${m.error.message||m.error.code}`,"bad");return}
+  if(m.msg_type==="active_symbols"){symbols=m.active_symbols||[];renderMarkets()}
+  if(m.msg_type==="history"){
+    ticks=(m.history?.prices||[]).map(q=>digitFromQuote(q,pip)).filter(Number.isInteger);render();
+  }
+  if(m.msg_type==="tick"){
+    if(m.subscription?.id)subId=m.subscription.id;
+    const d=digitFromQuote(m.tick?.quote,pip??m.tick?.pip_size);
+    if(Number.isInteger(d)){
+      $("liveTick").textContent=m.tick.quote;
+      ticks.push(d);if(ticks.length>2000)ticks.shift();
+      if(paperPending){
+        const result=d===paperPending.pred?"WIN":"LOSS";
+        paperHistory.unshift({time:new Date().toLocaleTimeString(),market:$("market").selectedOptions[0]?.text||$("market").value,pred:paperPending.pred,actual:d,result});
+        paperPending=null;cooldown=true;renderHistory();renderPaperStatus();
+        setTimeout(()=>{cooldown=false;if(autoPaper)startPaper(true)},250);
+      }
+      render();
+      if(autoPaper&&!paperPending&&!cooldown)startPaper(true);
+    }
+  }
+}
+function connect(){
+  clearTimeout(reconnectTimer);setStatus("Connecting to Deriv public market data…","warn");
+  if(ws&&(ws.readyState===0||ws.readyState===1))try{ws.close()}catch{}
+  ws=new WebSocket(WS_URL);
+  ws.onopen=()=>{setStatus("CONNECTED — live public market data","good");send({active_symbols:"brief"})};
+  ws.onmessage=e=>{try{handle(JSON.parse(e.data))}catch(err){console.error(err)}};
+  ws.onerror=()=>setStatus("WebSocket error. Check internet or firewall.","bad");
+  ws.onclose=()=>{setStatus("Disconnected. Reconnecting…","warn");reconnectTimer=setTimeout(connect,2500)};
+}
+function startPaper(auto=false){
+  if(!Number.isInteger(prediction)){if(!auto)$("paperStatus").textContent="Wait until a Match candidate appears.";return}
+  if(requireAgreement&&analysis?.agreement<3){if(!auto)$("paperStatus").textContent=`Filtered: model agreement is ${analysis?.agreement||0}/4. Need 3/4.`;return}
+  paperPending={pred:prediction,stake:Number($("paperStake").value)||1};
+  renderPaperStatus();
+}
+function renderPaperStatus(){
+  if(paperPending)$("paperStatus").textContent=`Waiting for next tick — testing MATCH ${paperPending.pred}`;
+  else if(paperHistory.length)$("paperStatus").textContent=`Last: MATCH ${paperHistory[0].pred} → actual ${paperHistory[0].actual} → ${paperHistory[0].result}`;
+  else $("paperStatus").textContent="No paper test running.";
+}
+function renderHistory(){
+  const h=$("historyBody");
+  h.innerHTML=paperHistory.length?paperHistory.slice(0,40).map(x=>`<div class="history-row"><div>${x.time}</div><div>${x.market}</div><div>${x.pred} → ${x.actual}</div><div class="${x.result==="WIN"?"win":"loss"}">${x.result}</div></div>`).join(""):'<div class="history-row"><div class="small">No paper trades yet.</div><div></div><div></div><div></div></div>';
+  const t=paperHistory.length,w=paperHistory.filter(x=>x.result==="WIN").length,l=t-w,r=t?w/t*100:0;
+  $("sessionTrades").textContent=t;$("sessionWins").textContent=w;$("sessionLosses").textContent=l;$("sessionRate").textContent=r.toFixed(1)+"%";$("winBar").style.width=Math.min(100,r)+"%";
+}
+async function authStatus(){
+  try{
+    const r=await fetch("/api/auth/status",{credentials:"same-origin"}),d=await r.json();
+    if(d.authenticated){
+      $("authDot").className="dot on";$("authTitle").textContent="Authenticated with Deriv";
+      const accounts=d.accounts||[];$("authDetail").textContent=`${accounts.length} Options account(s) found.`;
+      $("accountSummary").textContent=accounts.length?accounts.map(a=>`${a.account_id||"Account"} · ${a.account_type||"unknown"} · ${a.currency||""}`).join(" | "):"Signed in.";
+      $("derivLogin").classList.add("hidden");$("logoutBtn").classList.remove("hidden");$("topMode").textContent="DERIV AUTHENTICATED";
+    }else{
+      $("authDot").className="dot";$("authTitle").textContent=d.configured?"Deriv login available":"Deriv login setup required";
+      $("authDetail").textContent=d.configured?"Click Login with Deriv to authenticate securely.":"Public mode works now. OAuth login becomes active after the deployed app has a Deriv OAuth client ID and registered HTTPS callback.";
+      $("derivLogin").classList.remove("hidden");$("logoutBtn").classList.add("hidden");$("topMode").textContent="PUBLIC MODE";
+    }
+  }catch{
+    $("authDot").className="dot off";$("authTitle").textContent="Authentication status unavailable";$("authDetail").textContent="Public scanner can still be used.";
+  }
+}
+
+$("market").addEventListener("change",()=>startMarket($("market").value));
+$("windowSize").addEventListener("change",render);
+$("reconnectBtn").addEventListener("click",connect);
+$("paperBtn").addEventListener("click",()=>startPaper(false));
+$("autoSwitch").addEventListener("click",e=>{autoPaper=!autoPaper;e.currentTarget.classList.toggle("on",autoPaper);if(autoPaper)startPaper(true)});
+$("agreementSwitch").addEventListener("click",e=>{requireAgreement=!requireAgreement;e.currentTarget.classList.toggle("on",requireAgreement)});
+$("clearHistory").addEventListener("click",()=>{paperHistory=[];renderHistory();renderPaperStatus()});
+$("publicMode").addEventListener("click",()=>location.hash="#dashboard");
+$("logoutBtn").addEventListener("click",async()=>{await fetch("/auth/logout",{method:"POST",credentials:"same-origin"});await authStatus()});
+const qp=new URLSearchParams(location.search);if(qp.get("login")==="success")history.replaceState({},document.title,location.pathname+"#dashboard");
+
+renderHistory();renderPaperStatus();authStatus();connect();
+</script>
+</body>
+</html>
