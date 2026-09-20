@@ -1,24 +1,28 @@
-# MatchPredict AI V23.7 — Clear Signal Labels
+# MatchPredict AI V25.1 — Three Payment Methods
 
-V23.7 keeps the V23.6 workflow and makes the two percentages clearer for users.
+This version keeps the V25 analyzer, 2-day free trial, $100/month subscription,
+separate pages, Deriv login structure, and persistent subscription database support.
 
-Normal volatility result:
-- MATCH 5
-- DIGIT SCORE 78%
+## Payment methods included
+1. Flutterwave
+2. Pesapal
+3. Binance Pay
 
-Digit Score = how strongly the normal model ranks that digit against the other digits.
+Trust Wallet and OKX are not included in this version.
 
-10-second live scanner result:
-- MATCH 5
-- LIVE SIGNAL STRENGTH 96%
+## Subscription
+- 2-day free trial
+- MatchPredict Pro: $100 USD / 30 days
+- Analyzer access can be locked after trial expiry when `TRIAL_ENFORCEMENT=true`
+- Real charging is active only when `PAYMENTS_ENABLED=true`
 
-Live Signal Strength = how strongly the checks inside the 10-second live scanner agree on the final Match digit.
+## Before public paid launch
+1. Configure PostgreSQL and set `DATABASE_URL`.
+2. Configure and test Deriv OAuth.
+3. Add merchant credentials for Flutterwave, Pesapal, and/or Binance Pay.
+4. Test every enabled payment provider.
+5. Keep `PAYMENTS_ENABLED=false` until payment verification is confirmed.
+6. Keep `TRIAL_ENFORCEMENT=false` until at least one working payment provider can unlock the analyzer.
+7. After successful tests, set both switches to `true`.
 
-User flow:
-1. SCAN FULL MARKET
-2. See BEST VOLATILITY
-3. Press ANALYZE BEST MATCH DIGIT
-4. Wait 10 seconds
-5. Read the final MATCH digit and LIVE SIGNAL STRENGTH
-
-These percentages are internal model-strength scores. They do not guarantee a winning Deriv trade.
+Never put merchant secrets or API keys in GitHub or public HTML. Keep them in Render environment variables.

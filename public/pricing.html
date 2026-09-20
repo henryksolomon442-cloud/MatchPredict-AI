@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MatchPredict AI — Subscription</title>
+<style>
+:root{--bg:#080a0e;--panel:#10141a;--line:#29323d;--text:#f5f7fb;--muted:#939da9;--amber:#ffb000;--green:#39d69c;--red:#ff6f7b}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% 12%,rgba(255,176,0,.1),transparent 26%),#080a0e;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+a{text-decoration:none;color:inherit}.shell{width:min(1050px,92vw);margin:auto}.topbar{border-bottom:1px solid #202833;background:#090c11;position:sticky;top:0;z-index:10}
+.top{min-height:68px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.brand{font-weight:1000}.brand span{color:var(--amber)}
+.nav{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#121820;color:#fff;border-radius:10px;padding:11px 14px;font-weight:900;font-size:12px;cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,#ffc12d,#ff7a00);color:#101010}.btn:disabled{opacity:.38;cursor:not-allowed}
+main{padding:44px 0 70px}.card{background:linear-gradient(145deg,#11161d,#0d1117);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:14px}
+.eyebrow{font-size:10px;color:var(--amber);font-weight:1000;letter-spacing:.14em;text-transform:uppercase}h1{font-size:clamp(38px,7vw,68px);line-height:.95;margin:12px 0}h1 span{color:var(--amber)}
+.muted{color:var(--muted);line-height:1.6}.price{font-size:56px;font-weight:1000}.price small{font-size:16px;color:var(--muted)}
+.paygrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}.pay{min-height:125px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid #29323d;background:#0e141a;border-radius:13px;padding:14px}
+.payname{font-weight:1000;font-size:17px}.state{font-size:10px;color:#9ba6b2;margin:8px 0}.ready{color:#64e5ac}.notready{color:#ffbb54}
+.field{display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center;margin-top:14px}.field input{width:100%;background:#0c1117;border:1px solid #2b3541;color:#fff;padding:12px;border-radius:10px}
+.status{margin-top:14px;padding:12px;border-radius:11px;border:1px solid #2b3541;background:#0b1016;min-height:46px}.hidden{display:none}
+@media(max-width:900px){.paygrid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.paygrid{grid-template-columns:1fr}.field{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="shell top">
+  <div class="brand">MATCH<span>PREDICT</span> AI</div>
+  <div class="nav"><a class="btn" href="/dashboard">DASHBOARD</a><a class="btn" href="/analyze">ANALYZE</a><a class="btn" href="/">ACCOUNT</a></div>
+</div></div>
+<main class="shell">
+  <section class="card">
+    <div class="eyebrow">MATCHPREDICT PRO</div>
+    <h1>$100 <span>/ month</span></h1>
+    <p class="muted">One plan. 30 days of analyzer access after confirmed payment. New users receive a 2-day free trial.</p>
+    <div class="field"><label>Email for checkout</label><input id="email" type="email" placeholder="you@example.com"></div>
+    <div class="status" id="accessStatus">Checking your account and subscription…</div>
+  </section>
+
+  <section class="card">
+    <div class="eyebrow">CHOOSE PAYMENT METHOD</div>
+    <div class="paygrid">
+      <div class="pay"><div><div class="payname">Flutterwave</div><div class="state" id="st-flutterwave">Checking…</div></div><button class="btn primary" data-provider="flutterwave">PAY $100</button></div>
+      <div class="pay"><div><div class="payname">Pesapal</div><div class="state" id="st-pesapal">Checking…</div></div><button class="btn primary" data-provider="pesapal">PAY $100</button></div>
+      <div class="pay"><div><div class="payname">Binance Pay</div><div class="state" id="st-binance">Checking…</div></div><button class="btn primary" data-provider="binance">PAY $100</button></div>
+    </div>
+    <div class="status" id="paymentStatus">Select an available payment method.</div>
+    <p class="muted" style="font-size:11px;margin-bottom:0">
+      Payment methods remain disabled until their merchant credentials are configured on the server.
+    </p>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let config=null;
+let access=null;
+
+async function load(){
+  const [cr,ar]=await Promise.all([
+    fetch("/api/payments/config",{credentials:"same-origin"}),
+    fetch("/api/access/status",{credentials:"same-origin"})
+  ]);
+  config=await cr.json();
+  access=await ar.json();
+
+  if(!access.authenticated){
+    $("accessStatus").innerHTML='Please <a href="/" style="color:#ffb000">login with Deriv</a> before starting a paid subscription.';
+  }else if(access.subscription_active){
+    $("accessStatus").textContent=`Subscription active until ${new Date(access.subscription_expires_at).toLocaleString()}.`;
+  }else if(access.trial && !access.trial.expired){
+    const h=Math.floor(access.trial.remaining_ms/3600000);
+    $("accessStatus").textContent=`2-day free trial active · about ${h} hours remaining.`;
+  }else{
+    $("accessStatus").textContent="Free trial ended. Choose a payment method to activate 30 days of MatchPredict Pro.";
+  }
+
+  for(const p of ["flutterwave","pesapal","binance"]){
+    const ready=Boolean(config.enabled&&config.providers[p]);
+    const st=$("st-"+p);
+    st.textContent=ready?"AVAILABLE":"NOT CONFIGURED";
+    st.className="state "+(ready?"ready":"notready");
+    document.querySelector(`[data-provider="${p}"]`).disabled=!ready||!access.authenticated;
+  }
+
+  const qs=new URLSearchParams(location.search);
+  if(qs.get("payment")==="failed")$("paymentStatus").textContent="Payment was not confirmed. Please try again.";
+  if(qs.get("payment")==="cancelled")$("paymentStatus").textContent="Payment was cancelled.";
+  const provider=qs.get("provider"),ref=qs.get("ref");
+  if(provider&&ref&&provider==="binance") checkPayment(provider,ref);
+}
+
+async function pay(provider){
+  const email=$("email").value.trim();
+  if(!access?.authenticated){location.href="/";return}
+  if((provider==="flutterwave"||provider==="pesapal")&&!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){
+    $("paymentStatus").textContent="Enter a valid email first.";
+    return;
+  }
+
+  $("paymentStatus").textContent=`Creating ${provider} payment…`;
+  const r=await fetch(`/api/payments/${provider}/create`,{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    credentials:"same-origin",body:JSON.stringify({email})
+  });
+  const d=await r.json();
+  if(!r.ok||!d.ok){
+    $("paymentStatus").textContent=`Could not start payment: ${d.error||"unknown error"}`;
+    return;
+  }
+  location.href=d.checkout_url;
+}
+
+async function checkPayment(provider,ref){
+  $("paymentStatus").textContent=`Checking ${provider} payment…`;
+  try{
+    const r=await fetch(`/api/payments/${provider}/check?ref=${encodeURIComponent(ref)}`,{credentials:"same-origin"});
+    const d=await r.json();
+    if(d.paid){
+      $("paymentStatus").textContent="Payment confirmed. Your 30-day subscription is active.";
+      setTimeout(()=>location.href="/dashboard?payment=success",1000);
+    }else{
+      $("paymentStatus").textContent=`Payment status: ${d.status||"pending"}. Refresh this page after completing payment.`;
+    }
+  }catch{
+    $("paymentStatus").textContent="Could not check payment status.";
+  }
+}
+
+document.querySelectorAll("[data-provider]").forEach(b=>b.addEventListener("click",()=>pay(b.dataset.provider)));
+load().catch(()=>{$("paymentStatus").textContent="Could not load payment configuration."});
+</script>
+</body></html>

@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: matchpredict-ai-v22
+    name: matchpredict-ai
     runtime: node
     plan: free
     buildCommand: npm install
@@ -8,11 +8,31 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DERIV_OAUTH_CLIENT_ID
-        sync: false
       - key: APP_BASE_URL
+        sync: false
+      - key: DERIV_OAUTH_CLIENT_ID
         sync: false
       - key: DERIV_OAUTH_SCOPE
         value: trade
       - key: SESSION_SECRET
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: TRIAL_ENFORCEMENT
+        value: "false"
+      - key: PAYMENTS_ENABLED
+        value: "false"
+      - key: FLW_SECRET_KEY
+        sync: false
+      - key: PESAPAL_ENV
+        value: live
+      - key: PESAPAL_CONSUMER_KEY
+        sync: false
+      - key: PESAPAL_CONSUMER_SECRET
+        sync: false
+      - key: PESAPAL_NOTIFICATION_ID
+        sync: false
+      - key: BINANCE_PAY_API_KEY
+        sync: false
+      - key: BINANCE_PAY_SECRET_KEY
+        sync: false
