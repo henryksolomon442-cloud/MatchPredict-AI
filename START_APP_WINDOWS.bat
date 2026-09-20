@@ -1,10 +1,10 @@
 @echo off
-title MatchPredict AI V22
+title MatchPredict AI V23.7
 cd /d "%~dp0"
 
 echo.
 echo ===========================================
-echo   MatchPredict AI V22
+echo   MatchPredict AI V23.7
 echo ===========================================
 echo.
 

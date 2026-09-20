@@ -1,6 +1,6 @@
 {
-  "name": "matchpredict-ai-v22",
-  "version": "22.0.0",
+  "name": "matchpredict-ai-v23-7-clear-signal-labels",
+  "version": "23.7.0",
   "private": true,
   "scripts": {
     "start": "node server.js"

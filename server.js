@@ -27,7 +27,7 @@ function baseUrl(req){
 function callbackUrl(req){return `${baseUrl(req)}/auth/deriv/callback`}
 
 app.get("/api/health",(req,res)=>res.json({
-  ok:true,version:"22",mode:"public-scanner-oauth-ready-paper-only"
+  ok:true,version:"23.7",mode:"full-market-best-scanner-public-oauth-ready-paper-only"
 }));
 
 app.get("/api/auth/status",async(req,res)=>{
@@ -110,4 +110,4 @@ app.post("/auth/logout",(req,res)=>req.session.destroy(()=>res.json({ok:true})))
 app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
 
 const port=process.env.PORT||3000;
-app.listen(port,()=>console.log(`MatchPredict AI V22 running on port ${port}`));
+app.listen(port,()=>console.log(`MatchPredict AI V23 running on port ${port}`));

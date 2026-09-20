@@ -1,69 +1,24 @@
-# MatchPredict AI V22 — Video-Style Platform Build
+# MatchPredict AI V23.7 — Clear Signal Labels
 
-This is a fresh platform build inspired by the workflow and feel shown in the reference video, without copying its branding or exact design.
+V23.7 keeps the V23.6 workflow and makes the two percentages clearer for users.
 
-## What is included
+Normal volatility result:
+- MATCH 5
+- DIGIT SCORE 78%
 
-### Opening platform experience
-- Dark professional trading dashboard
-- MatchPredict AI branding
-- Deriv authentication panel
-- Public-mode fallback
-- Pricing / access section
-- Templates area
+Digit Score = how strongly the normal model ranks that digit against the other digits.
 
-### Digits / Match Number engine
-- Live Deriv public market-data connection
-- Synthetic/volatility market selector
-- Historical tick loading
-- Live tick subscription
-- Match candidate 0–9
-- Four-model agreement
-- Digit ranking
-- Recent last-digit sequence
-- Explanation/ranking metrics
+10-second live scanner result:
+- MATCH 5
+- LIVE SIGNAL STRENGTH 96%
 
-### One-click research engine
-- Manual next-tick paper test
-- Automatic paper-test mode
-- 3/4 agreement filter
-- Trade history
-- Wins/losses/hit-rate tracking
-- Session progress bar
+Live Signal Strength = how strongly the checks inside the 10-second live scanner agree on the final Match digit.
 
-### Authentication
-Deriv OAuth 2.0 + PKCE structure is included.
-The user enters their password only on Deriv's own login page.
+User flow:
+1. SCAN FULL MARKET
+2. See BEST VOLATILITY
+3. Press ANALYZE BEST MATCH DIGIT
+4. Wait 10 seconds
+5. Read the final MATCH digit and LIVE SIGNAL STRENGTH
 
-Public scanning does not require login.
-
-To activate OAuth after deployment, register:
-`https://YOUR-DOMAIN/auth/deriv/callback`
-
-and configure:
-- `DERIV_OAUTH_CLIENT_ID`
-- `APP_BASE_URL`
-- `SESSION_SECRET`
-
-## Easiest way to run on Windows
-
-Double-click:
-
-`START_APP_WINDOWS.bat`
-
-It installs packages if needed, starts the server, and opens:
-`http://localhost:3000`
-
-Or from VS Code terminal:
-
-```powershell
-npm.cmd install
-npm.cmd start
-```
-
-## Important scope
-
-The automatic engine in V22 is **paper testing**, not real-money automatic trading.
-The current dashboard does not fake account balances or fake profits.
-
-Prediction scores are heuristic rankings from observed tick data, not guaranteed probabilities.
+These percentages are internal model-strength scores. They do not guarantee a winning Deriv trade.
