@@ -1,6 +1,6 @@
 {
-  "name": "matchpredict-ai-v25-1-three-payments",
-  "version": "25.1.0",
+  "name": "matchpredict-ai-v25-2-owner-free-50-monthly",
+  "version": "25.2.0",
   "private": true,
   "scripts": {
     "start": "node server.js"

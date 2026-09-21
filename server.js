@@ -24,11 +24,16 @@ const AUTH_URL="https://auth.deriv.com/oauth2/auth";
 const TOKEN_URL="https://auth.deriv.com/oauth2/token";
 const DERIV_API_BASE="https://api.derivws.com";
 
-const PLAN_AMOUNT=100;
+const PLAN_AMOUNT=50;
 const PLAN_CURRENCY="USD";
 const PLAN_DAYS=30;
 const TRIAL_ENFORCEMENT=String(process.env.TRIAL_ENFORCEMENT||"false").toLowerCase()==="true";
 const PAYMENTS_ENABLED=String(process.env.PAYMENTS_ENABLED||"false").toLowerCase()==="true";
+const OWNER_DERIV_ACCOUNT_ID=String(process.env.OWNER_DERIV_ACCOUNT_ID||"").trim();
+
+function isOwnerUser(userKey){
+  return Boolean(OWNER_DERIV_ACCOUNT_ID && String(userKey||"")===OWNER_DERIV_ACCOUNT_ID);
+}
 
 function baseUrl(req){
   return (process.env.APP_BASE_URL||`${req.protocol}://${req.get("host")}`).replace(/\/+$/,"");
@@ -70,14 +75,16 @@ async function resolveUserKey(req){
 async function accessStatus(req){
   const userKey=await resolveUserKey(req);
   if(!userKey)return {
-    authenticated:false,user_key:null,trial:null,
+    authenticated:false,user_key:null,trial:null,owner_access:false,
     subscription_active:false,subscription_expires_at:null,
     enforcement_enabled:TRIAL_ENFORCEMENT,persistent_store:store.persistent()
   };
   const a=await store.getAccess(userKey);
+  const owner=isOwnerUser(userKey);
   return {
     authenticated:true,
     user_key:userKey,
+    owner_access:owner,
     trial:{
       started_at:a.trial_started_at.toISOString(),
       expires_at:a.trial_expires_at.toISOString(),
@@ -85,8 +92,8 @@ async function accessStatus(req){
       expired:a.trial_expired,
       duration_hours:48
     },
-    subscription_active:a.subscription_active,
-    subscription_expires_at:a.subscription_expires_at?a.subscription_expires_at.toISOString():null,
+    subscription_active:owner||a.subscription_active,
+    subscription_expires_at:owner?null:(a.subscription_expires_at?a.subscription_expires_at.toISOString():null),
     enforcement_enabled:TRIAL_ENFORCEMENT,
     persistent_store:store.persistent()
   };
@@ -97,7 +104,7 @@ async function analyzerAccess(req,res,next){
   try{
     const a=await accessStatus(req);
     if(!a.authenticated)return res.redirect("/?trial=login_required&next=/analyze");
-    if(a.subscription_active||!a.trial.expired)return next();
+    if(a.owner_access||a.subscription_active||!a.trial.expired)return next();
     return res.redirect("/pricing?trial=expired");
   }catch(e){
     console.error(e);
@@ -115,12 +122,16 @@ async function requirePaymentUser(req,res){
     res.status(401).json({ok:false,error:"login_required"});
     return null;
   }
+  if(isOwnerUser(key)){
+    res.status(409).json({ok:false,error:"owner_account_does_not_require_payment"});
+    return null;
+  }
   return key;
 }
 
 // ---------------- Status ----------------
 app.get("/api/health",(req,res)=>res.json({
-  ok:true,version:"25.1",mode:"online-subscriptions",
+  ok:true,version:"25.2",mode:"online-subscriptions",
   plan:{amount:PLAN_AMOUNT,currency:PLAN_CURRENCY,days:PLAN_DAYS},
   payments_enabled:PAYMENTS_ENABLED,
   persistent_store:store.persistent()
@@ -158,7 +169,7 @@ app.get("/api/trial/status",async(req,res)=>{
 app.get("/api/payments/config",(req,res)=>res.json({
   ok:true,
   enabled:PAYMENTS_ENABLED,
-  plan:{amount:100,currency:"USD",days:30},
+  plan:{amount:PLAN_AMOUNT,currency:"USD",days:30},
   providers:{
     flutterwave:Boolean(process.env.FLW_SECRET_KEY),
     pesapal:Boolean(process.env.PESAPAL_CONSUMER_KEY&&process.env.PESAPAL_CONSUMER_SECRET&&process.env.PESAPAL_NOTIFICATION_ID),
@@ -228,13 +239,13 @@ app.post("/api/payments/flutterwave/create",async(req,res)=>{
     if(!validEmail(email))return res.status(400).json({ok:false,error:"valid_email_required"});
 
     const reference=makeRef("FLW");
-    await store.createPayment({reference,userKey,provider:"flutterwave",amount:100,currency:"USD"});
+    await store.createPayment({reference,userKey,provider:"flutterwave",amount:PLAN_AMOUNT,currency:"USD"});
 
     const r=await fetch("https://api.flutterwave.com/v3/payments",{
       method:"POST",
       headers:{Authorization:`Bearer ${process.env.FLW_SECRET_KEY}`,"Content-Type":"application/json"},
       body:JSON.stringify({
-        tx_ref:reference,amount:100,currency:"USD",
+        tx_ref:reference,amount:PLAN_AMOUNT,currency:"USD",
         redirect_url:`${baseUrl(req)}/payments/flutterwave/callback`,
         customer:{email},
         customizations:{title:"MatchPredict Pro",description:"30-day MatchPredict Pro access"},
@@ -258,7 +269,7 @@ app.get("/payments/flutterwave/callback",async(req,res)=>{
     });
     const d=await vr.json();
     const paid=d?.data?.status==="successful" &&
-      Number(d?.data?.amount)>=100 &&
+      Number(d?.data?.amount)>=PLAN_AMOUNT &&
       String(d?.data?.currency||"").toUpperCase()==="USD" &&
       String(d?.data?.tx_ref||"")===reference;
 
@@ -294,14 +305,14 @@ app.post("/api/payments/pesapal/create",async(req,res)=>{
     if(!validEmail(email))return res.status(400).json({ok:false,error:"valid_email_required"});
 
     const reference=makeRef("PESA");
-    await store.createPayment({reference,userKey,provider:"pesapal",amount:100,currency:"USD"});
+    await store.createPayment({reference,userKey,provider:"pesapal",amount:PLAN_AMOUNT,currency:"USD"});
     const {base,token}=await pesapalToken();
 
     const r=await fetch(`${base}/Transactions/SubmitOrderRequest`,{
       method:"POST",
       headers:{Authorization:`Bearer ${token}`,Accept:"application/json","Content-Type":"application/json"},
       body:JSON.stringify({
-        id:reference,currency:"USD",amount:100,
+        id:reference,currency:"USD",amount:PLAN_AMOUNT,
         description:"MatchPredict Pro 30-day access",
         callback_url:`${baseUrl(req)}/payments/pesapal/callback`,
         cancellation_url:`${baseUrl(req)}/pricing?payment=cancelled`,
@@ -368,7 +379,7 @@ app.post("/api/payments/binance/create",async(req,res)=>{
     const userKey=await requirePaymentUser(req,res);if(!userKey)return;
     const reference=makeRef("BN");
 
-    await store.createPayment({reference,userKey,provider:"binance",amount:100,currency:"USDT"});
+    await store.createPayment({reference,userKey,provider:"binance",amount:PLAN_AMOUNT,currency:"USDT"});
 
     // Binance Pay has changed order APIs over time. This endpoint can be overridden in Render
     // without changing the app code.
@@ -376,7 +387,7 @@ app.post("/api/payments/binance/create",async(req,res)=>{
     const d=await binancePost(createPath,{
       env:{terminalType:"WEB"},
       merchantTradeNo:reference,
-      orderAmount:100,
+      orderAmount:PLAN_AMOUNT,
       currency:"USDT",
       description:"MatchPredict Pro 30-day access",
       goodsDetails:[{
@@ -418,5 +429,5 @@ app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")))
 
 const port=process.env.PORT||3000;
 store.initStore()
-  .then(()=>app.listen(port,()=>console.log(`MatchPredict AI V25.1 running on port ${port}`)))
+  .then(()=>app.listen(port,()=>console.log(`MatchPredict AI V25.2 running on port ${port}`)))
   .catch(e=>{console.error("Startup failed:",e);process.exit(1)});

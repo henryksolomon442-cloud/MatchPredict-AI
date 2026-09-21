@@ -44,7 +44,7 @@ h2{margin:7px 0 10px}.muted{color:var(--muted);line-height:1.65}.status{margin:1
   <div class="card tile"><div><div class="tag">FREE TESTING</div><div class="big" style="margin-top:14px">Plans</div><p class="muted">View free testing access. Paid subscriptions will be added later.</p></div><a class="btn" href="/pricing">VIEW PLANS</a></div>
   <div class="card tile"><div><div class="tag">DERIV</div><div class="big" style="margin-top:14px">Account</div><p class="muted">Sign in through Deriv or check your connection status.</p></div><a class="btn" href="/">OPEN ACCOUNT</a></div>
 </section>
-<div class="footer">MatchPredict AI V25.1 · Independent research interface</div>
+<div class="footer">MatchPredict AI V25.2 · Independent research interface</div>
 </main>
 <script>
 fetch("/api/auth/status",{credentials:"same-origin"}).then(r=>r.json()).then(d=>{
@@ -65,7 +65,9 @@ fetch("/api/trial/status",{credentials:"same-origin"}).then(r=>r.json()).then(d=
   const t=d.trial;
   const title=document.getElementById("trialHeadline");
   const detail=document.getElementById("trialDetail");
-  if(d.subscription_active){
+  if(d.owner_access){
+        status.textContent="OWNER ACCESS · Permanent access · No payment required";
+      }else if(d.subscription_active){
     title.textContent="Subscription active";
     detail.textContent="Your MatchPredict analyzer access is active.";
   }else if(t.expired){

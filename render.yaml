@@ -18,6 +18,8 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      - key: OWNER_DERIV_ACCOUNT_ID
+        sync: false
       - key: TRIAL_ENFORCEMENT
         value: "false"
       - key: PAYMENTS_ENABLED
