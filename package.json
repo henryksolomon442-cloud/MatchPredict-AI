@@ -1,6 +1,6 @@
 {
-  "name": "matchpredict-ai-v25-2-owner-free-50-monthly",
-  "version": "25.2.0",
+  "name": "digitedge-ai-v25-4-renamed",
+  "version": "25.4.0",
   "private": true,
   "scripts": {
     "start": "node server.js"

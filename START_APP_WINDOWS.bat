@@ -1,10 +1,10 @@
 @echo off
-title MatchPredict AI V24.7
+title DigitEdge AI V24.7
 cd /d "%~dp0"
 
 echo.
 echo ===========================================
-echo   MatchPredict AI V24.7
+echo   DigitEdge AI V24.7
 echo ===========================================
 echo.
 
@@ -19,8 +19,8 @@ if not exist node_modules (
   )
 )
 
-echo Starting MatchPredict AI...
-start "MatchPredict AI Server" cmd /k "cd /d ""%~dp0"" && npm.cmd start"
+echo Starting DigitEdge AI...
+start "DigitEdge AI Server" cmd /k "cd /d ""%~dp0"" && npm.cmd start"
 timeout /t 3 /nobreak >nul
 start "" "http://localhost:3000"
 

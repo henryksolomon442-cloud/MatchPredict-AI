@@ -131,7 +131,7 @@ async function requirePaymentUser(req,res){
 
 // ---------------- Status ----------------
 app.get("/api/health",(req,res)=>res.json({
-  ok:true,version:"25.2",mode:"online-subscriptions",
+  ok:true,version:"25.4",mode:"online-subscriptions",
   plan:{amount:PLAN_AMOUNT,currency:PLAN_CURRENCY,days:PLAN_DAYS},
   payments_enabled:PAYMENTS_ENABLED,
   persistent_store:store.persistent()
@@ -248,7 +248,7 @@ app.post("/api/payments/flutterwave/create",async(req,res)=>{
         tx_ref:reference,amount:PLAN_AMOUNT,currency:"USD",
         redirect_url:`${baseUrl(req)}/payments/flutterwave/callback`,
         customer:{email},
-        customizations:{title:"MatchPredict Pro",description:"30-day MatchPredict Pro access"},
+        customizations:{title:"DigitEdge Pro",description:"30-day DigitEdge Pro access"},
         meta:{matchpredict_reference:reference}
       })
     });
@@ -313,7 +313,7 @@ app.post("/api/payments/pesapal/create",async(req,res)=>{
       headers:{Authorization:`Bearer ${token}`,Accept:"application/json","Content-Type":"application/json"},
       body:JSON.stringify({
         id:reference,currency:"USD",amount:PLAN_AMOUNT,
-        description:"MatchPredict Pro 30-day access",
+        description:"DigitEdge Pro 30-day access",
         callback_url:`${baseUrl(req)}/payments/pesapal/callback`,
         cancellation_url:`${baseUrl(req)}/pricing?payment=cancelled`,
         notification_id:process.env.PESAPAL_NOTIFICATION_ID,
@@ -389,12 +389,12 @@ app.post("/api/payments/binance/create",async(req,res)=>{
       merchantTradeNo:reference,
       orderAmount:PLAN_AMOUNT,
       currency:"USDT",
-      description:"MatchPredict Pro 30-day access",
+      description:"DigitEdge Pro 30-day access",
       goodsDetails:[{
         goodsType:"02",
         goodsCategory:"Z000",
-        referenceGoodsId:"MATCHPREDICT-PRO-30",
-        goodsName:"MatchPredict Pro 30 days"
+        referenceGoodsId:"DIGITEDGE-PRO-30",
+        goodsName:"DigitEdge Pro 30 days"
       }],
       returnUrl:`${baseUrl(req)}/pricing?provider=binance&ref=${reference}`,
       cancelUrl:`${baseUrl(req)}/pricing?payment=cancelled`
@@ -421,6 +421,37 @@ app.get("/api/payments/binance/check",async(req,res)=>{
   }catch(e){res.status(500).json({ok:false,error:"binance_check_failed"})}
 });
 
+
+// ---------------- Free SEO ----------------
+app.get("/robots.txt",(req,res)=>{
+  const base=baseUrl(req);
+  res.type("text/plain").send(`User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /auth/
+Sitemap: ${base}/sitemap.xml
+`);
+});
+
+app.get("/sitemap.xml",(req,res)=>{
+  const base=baseUrl(req);
+  const urls=[
+    {loc:`${base}/`,priority:"1.0",freq:"weekly"},
+    {loc:`${base}/dashboard`,priority:"0.8",freq:"weekly"},
+    {loc:`${base}/analyze`,priority:"0.9",freq:"weekly"},
+    {loc:`${base}/pricing`,priority:"0.7",freq:"monthly"}
+  ];
+  const body=`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map(u=>`  <url>
+    <loc>${u.loc}</loc>
+    <changefreq>${u.freq}</changefreq>
+    <priority>${u.priority}</priority>
+  </url>`).join("\n")}
+</urlset>`;
+  res.type("application/xml").send(body);
+});
+
 // ---------------- Pages ----------------
 app.get("/dashboard",(req,res)=>res.sendFile(path.join(__dirname,"public","dashboard.html")));
 app.get("/analyze",analyzerAccess,(req,res)=>res.sendFile(path.join(__dirname,"public","analyze.html")));
@@ -429,5 +460,5 @@ app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")))
 
 const port=process.env.PORT||3000;
 store.initStore()
-  .then(()=>app.listen(port,()=>console.log(`MatchPredict AI V25.2 running on port ${port}`)))
+  .then(()=>app.listen(port,()=>console.log(`DigitEdge AI V25.4 running on port ${port}`)))
   .catch(e=>{console.error("Startup failed:",e);process.exit(1)});

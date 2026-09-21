@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MatchPredict AI — Subscription</title>
+<title>DigitEdge AI Pricing — $50 Monthly</title>
 <style>
 :root{--bg:#080a0e;--panel:#10141a;--line:#29323d;--text:#f5f7fb;--muted:#939da9;--amber:#ffb000;--green:#39d69c;--red:#ff6f7b}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% 12%,rgba(255,176,0,.1),transparent 26%),#080a0e;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}
@@ -19,6 +19,30 @@ main{padding:44px 0 70px}.card{background:linear-gradient(145deg,#11161d,#0d1117
 .status{margin-top:14px;padding:12px;border-radius:11px;border:1px solid #2b3541;background:#0b1016;min-height:46px}.hidden{display:none}
 @media(max-width:900px){.paygrid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.paygrid{grid-template-columns:1fr}.field{grid-template-columns:1fr}}
 </style>
+
+<meta name="description" content="DigitEdge Pro includes a 2-day free trial and costs $50 for 30 days of analyzer access with Flutterwave, Pesapal, and Binance Pay options.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+<meta property="og:title" content="DigitEdge AI Pricing — $50 Monthly">
+<meta property="og:description" content="DigitEdge Pro includes a 2-day free trial and costs $50 for 30 days of analyzer access with Flutterwave, Pesapal, and Binance Pay options.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="DigitEdge AI Pricing — $50 Monthly">
+<meta name="twitter:description" content="DigitEdge Pro includes a 2-day free trial and costs $50 for 30 days of analyzer access with Flutterwave, Pesapal, and Binance Pay options.">
+<link rel="manifest" href="/site.webmanifest">
+<script>
+(function(){
+  const canonical = new URL("/pricing", window.location.origin).href;
+  const link = document.createElement("link");
+  link.rel = "canonical";
+  link.href = canonical;
+  document.head.appendChild(link);
+  const og = document.createElement("meta");
+  og.setAttribute("property","og:url");
+  og.setAttribute("content",canonical);
+  document.head.appendChild(og);
+})();
+</script>
+
 </head>
 <body>
 <div class="topbar"><div class="shell top">
@@ -27,7 +51,7 @@ main{padding:44px 0 70px}.card{background:linear-gradient(145deg,#11161d,#0d1117
 </div></div>
 <main class="shell">
   <section class="card">
-    <div class="eyebrow">MATCHPREDICT PRO</div>
+    <div class="eyebrow">DIGITEDGE PRO</div>
     <h1>$50 <span>/ month</span></h1>
     <p class="muted">One plan. 30 days of analyzer access after confirmed payment. New users receive a 2-day free trial.</p>
     <div class="field"><label>Email for checkout</label><input id="email" type="email" placeholder="you@example.com"></div>
@@ -63,14 +87,14 @@ async function load(){
   if(!access.authenticated){
     $("accessStatus").innerHTML='Please <a href="/" style="color:#ffb000">login with Deriv</a> before starting a paid subscription.';
   }else if(access.owner_access){
-    $("accessStatus").textContent="OWNER ACCESS · Permanent MatchPredict access · No subscription payment required.";
+    $("accessStatus").textContent="OWNER ACCESS · Permanent DigitEdge access · No subscription payment required.";
   }else if(access.subscription_active){
     $("accessStatus").textContent=`Subscription active until ${new Date(access.subscription_expires_at).toLocaleString()}.`;
   }else if(access.trial && !access.trial.expired){
     const h=Math.floor(access.trial.remaining_ms/3600000);
     $("accessStatus").textContent=`2-day free trial active · about ${h} hours remaining.`;
   }else{
-    $("accessStatus").textContent="Free trial ended. Choose a payment method to activate 30 days of MatchPredict Pro.";
+    $("accessStatus").textContent="Free trial ended. Choose a payment method to activate 30 days of DigitEdge Pro.";
   }
 
   for(const p of ["flutterwave","pesapal","binance"]){

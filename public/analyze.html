@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#090b0f">
-<title>MatchPredict AI — Analyze</title>
+<title>DigitEdge AI Analyzer — Live Deriv Match Digit Scanner</title>
 <style>
 :root{
   --bg:#080a0e;--panel:#101318;--panel2:#151a20;--line:#282f38;--text:#f5f7fb;
@@ -178,6 +178,30 @@ select:focus,input:focus{border-color:#7d5b19}
 @media(max-width:460px){.live-signal-body{grid-template-columns:64px 1fr}.live-signal-digit{height:64px;font-size:40px}.live-signal-level{font-size:27px}}
 
 </style>
+
+<meta name="description" content="Analyze Deriv synthetic volatility markets, scan for the strongest volatility, and lock qualified Match digit signals with DigitEdge AI.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+<meta property="og:title" content="DigitEdge AI Analyzer — Live Deriv Match Digit Scanner">
+<meta property="og:description" content="Analyze Deriv synthetic volatility markets, scan for the strongest volatility, and lock qualified Match digit signals with DigitEdge AI.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="DigitEdge AI Analyzer — Live Deriv Match Digit Scanner">
+<meta name="twitter:description" content="Analyze Deriv synthetic volatility markets, scan for the strongest volatility, and lock qualified Match digit signals with DigitEdge AI.">
+<link rel="manifest" href="/site.webmanifest">
+<script>
+(function(){
+  const canonical = new URL("/analyze", window.location.origin).href;
+  const link = document.createElement("link");
+  link.rel = "canonical";
+  link.href = canonical;
+  document.head.appendChild(link);
+  const og = document.createElement("meta");
+  og.setAttribute("property","og:url");
+  og.setAttribute("content",canonical);
+  document.head.appendChild(og);
+})();
+</script>
+
 </head>
 <body>
 
@@ -202,7 +226,7 @@ select:focus,input:focus{border-color:#7d5b19}
       <div style="font-size:18px;font-weight:1000;margin-top:6px" id="trialAccessTitle">Checking access…</div>
       <div class="small" style="margin-top:6px" id="trialAccessDetail">Please wait.</div>
     </div>
-      <div class="eyebrow">MATCHPREDICT AI · LIVE ANALYZER</div>
+      <div class="eyebrow">DIGITEDGE AI · LIVE ANALYZER</div>
       <h1>Analyze the <span>best volatility</span>, then its Match digit.</h1>
       <p class="hero-copy">
         This page is only for analysis. Scan the volatility markets, identify the strongest market,
@@ -255,7 +279,7 @@ select:focus,input:focus{border-color:#7d5b19}
           <div class="eyebrow">FULL MARKET SCANNER</div>
           <div class="full-scan-title">Find the strongest volatility first, then analyze its best Match digit</div>
           <div class="full-scan-sub">
-            Scan all selected volatility markets first. MatchPredict creates a shortlist of the strongest markets,
+            Scan all selected volatility markets first. DigitEdge creates a shortlist of the strongest markets,
             selects the #1 volatility, and only then runs the 10-second Match-digit analysis on that best volatility.
           </div>
         </div>
@@ -300,7 +324,7 @@ select:focus,input:focus{border-color:#7d5b19}
 <section class="section" id="dashboard">
     <div class="panel-title">
       <div>
-        <div class="eyebrow">MATCHPREDICT AI</div>
+        <div class="eyebrow">DIGITEDGE AI</div>
         <h2 style="margin-top:5px">Trading Dashboard</h2>
       </div>
       <div class="tag" id="liveBadge">CONNECTING</div>
@@ -414,7 +438,7 @@ select:focus,input:focus{border-color:#7d5b19}
 
 
   <div class="footer">
-    MatchPredict AI is an independent research interface. Model rankings and paper-test results do not guarantee future outcomes.
+    DigitEdge AI is an independent research interface. Model rankings and paper-test results do not guarantee future outcomes.
   </div>
 </main>
 
@@ -1254,7 +1278,7 @@ fetch("/api/trial/status",{credentials:"same-origin"}).then(r=>r.json()).then(d=
   }else if(t.expired){
     title.textContent=t.enforcement_enabled?"Free trial expired":"2-day trial expired · testing still open";
     detail.textContent=t.enforcement_enabled
-      ?"Choose a plan to continue using MatchPredict AI."
+      ?"Choose a plan to continue using DigitEdge AI."
       :"Expiration enforcement is disabled while payments are not active.";
   }else{
     const h=Math.max(0,Math.floor(t.remaining_ms/3600000));
