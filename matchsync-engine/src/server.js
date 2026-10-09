@@ -1,4 +1,6 @@
 const express = require("express");
+const crypto = require("crypto");
+const syncApiKey = process.env.SYNC_API_KEY || "";
 const path = require("path");
 const { DerivPublicFeed } = require("./derivPublic");
 const { lastDigit, analyzeMarket } = require("./analyzer");
@@ -6,7 +8,7 @@ const { makeSignal, isFresh } = require("./signal");
 const { PaperExecution } = require("./paperExecution");
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "16kb" }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 const port = Number(process.env.PORT || 3000);
 const appId = process.env.DERIV_APP_ID;
@@ -19,6 +21,7 @@ const staleAfterMs = Math.max(3000, Number(process.env.STALE_AFTER_MS || 10000))
 const markets = Object.fromEntries(symbols.map(symbol => [symbol, { ticks: [], latestQuote: null, latestEpoch: null, lastTickAt: null, tickCount: 0 }]));
 let feedStatus = { connected: false, message: appId ? "Waiting for feed…" : "Set DERIV_APP_ID to connect." };
 let latestSignal = null, signalCount = 0, startedAt = Date.now(), feed = null, lastTickAt = null;
+const receivedSourceIds = new Set();
 const paperExecution = new PaperExecution({
   maxStake: Number(process.env.PAPER_MAX_STAKE || 0.35),
   cooldownMs: Number(process.env.PAPER_COOLDOWN_MS || 1000)
@@ -68,6 +71,7 @@ app.get("/api/status", (_req, res) => {
     app: "MatchSync Engine", mode: "PAPER_ONLY", tradingEnabled: false,
     uptimeSeconds: Math.floor((now - startedAt) / 1000),
     feedStatus: { ...feedStatus, liveTickSeen, lastTickAgeMs: ageMs, staleAfterMs }, signalCount,
+    digitEdgeSync: { enabled: Boolean(syncApiKey), endpoint: "/api/ingest-signal", mode: "PAPER_ONLY" },
     latestSignal: isFresh(latestSignal) && signalMarketFresh ? latestSignal : null,
     rankedMarkets: getRankedMarkets(),
     settings: { windowSize, minSamples, ttlMs, minConfidence, staleAfterMs, symbols }
@@ -80,6 +84,54 @@ app.get("/api/signal", (_req, res) => {
     return res.status(404).json({ ok: false, message: "No fresh signal or live market tick available." });
   res.set("Cache-Control", "no-store");
   res.json({ ok: true, signal: latestSignal, execution: "DISABLED_PAPER_ONLY" });
+});
+app.post("/api/ingest-signal", (req, res) => {
+  // Server-side key required. This endpoint never places trades.
+  if (!syncApiKey) return res.status(503).json({ ok: false, reason: "SYNC_DISABLED", message: "Configure SYNC_API_KEY on the server first." });
+  const supplied = req.get("x-sync-key") || "";
+  const a = Buffer.from(supplied);
+  const b = Buffer.from(syncApiKey);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b))
+    return res.status(401).json({ ok: false, reason: "UNAUTHORIZED" });
+
+  const body = req.body || {};
+  const symbol = typeof body.symbol === "string" ? body.symbol.trim() : "";
+  const matchDigit = Number(body.matchDigit);
+  const evenOdd = typeof body.evenOdd === "string" ? body.evenOdd.toUpperCase() : "";
+  const generatedAt = Number(body.generatedAt);
+  const sourceId = typeof body.sourceId === "string" ? body.sourceId.slice(0, 128) : "";
+  const now = Date.now();
+
+  if (!symbols.includes(symbol))
+    return res.status(400).json({ ok: false, reason: "INVALID_SYMBOL", allowedSymbols: symbols });
+  if (!Number.isInteger(matchDigit) || matchDigit < 0 || matchDigit > 9)
+    return res.status(400).json({ ok: false, reason: "INVALID_MATCH_DIGIT" });
+  if (!["EVEN", "ODD"].includes(evenOdd))
+    return res.status(400).json({ ok: false, reason: "INVALID_EVEN_ODD" });
+  if (!Number.isFinite(generatedAt) || generatedAt > now + 1000 || now - generatedAt > 10000)
+    return res.status(409).json({ ok: false, reason: "STALE_OR_INVALID_TIMESTAMP", maxAgeMs: 10000 });
+  if (sourceId && receivedSourceIds.has(sourceId))
+    return res.status(409).json({ ok: false, reason: "DUPLICATE_SOURCE_ID" });
+
+  const market = markets[symbol];
+  if (market.lastTickAt === null || now - market.lastTickAt > staleAfterMs)
+    return res.status(409).json({ ok: false, reason: "MARKET_TICK_STALE" });
+
+  const confidence = Number(body.confidence);
+  latestSignal = {
+    id: crypto.randomUUID(), sourceId: sourceId || null, source: "DIGITEDGE_SYNC",
+    symbol, volatility: symbol, matchDigit, evenOdd,
+    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
+    createdAt: now, receivedAt: now, sourceGeneratedAt: generatedAt,
+    expiresAt: now + ttlMs, mode: "PAPER_ONLY"
+  };
+  if (sourceId) {
+    receivedSourceIds.add(sourceId);
+    if (receivedSourceIds.size > 1000) receivedSourceIds.delete(receivedSourceIds.values().next().value);
+  }
+  signalCount++;
+  res.set("Cache-Control", "no-store");
+  return res.status(202).json({ ok: true, accepted: true, signal: latestSignal, execution: "DISABLED_PAPER_ONLY" });
 });
 app.get("/api/health", (_req, res) => res.json({ ok: true, mode: "PAPER_ONLY" }));
 app.post("/api/paper-execute", (req, res) => {
