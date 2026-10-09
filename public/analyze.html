@@ -706,6 +706,41 @@ function modeDigit(arr){
   return best;
 }
 
+async function syncLockedDigitEdgeSignal(s,candidate,level){
+  if(!s?.liveSignal)return;
+  s.liveSignal.syncStatus="SENDING";
+  renderMarketMatrix();
+  const payload={
+    symbol:s.symbol,
+    matchDigit:candidate,
+    evenOdd:candidate%2===0?"EVEN":"ODD",
+    generatedAt:s.liveSignal.generatedAt,
+    sourceId:s.liveSignal.sourceId,
+    signalLevel:level
+  };
+  try{
+    const response=await fetch("/api/sync/digitedge",{
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+    const result=await response.json().catch(()=>({}));
+    if(response.ok && result.accepted){
+      if(result.execution?.ok)s.liveSignal.syncStatus="ORDER_CONFIRMED";
+      else if(result.execution?.status==="blocked" || result.execution?.ok===false)s.liveSignal.syncStatus="EXECUTION_BLOCKED";
+      else s.liveSignal.syncStatus="SIGNAL_ACCEPTED";
+    }else if(result.reason==="DERIV_LOGIN_REQUIRED" || response.status===401){
+      s.liveSignal.syncStatus="LOGIN_REQUIRED";
+    }else{
+      s.liveSignal.syncStatus="SYNC_REJECTED";
+    }
+  }catch{
+    s.liveSignal.syncStatus="SYNC_FAILED";
+  }
+  renderMarketMatrix();
+}
+
 function finishLiveScanWithLockedSignal(s,candidate,level,reason="threshold"){
   if(!s?.liveScan)return;
   if(s.liveScan.timeoutId) clearTimeout(s.liveScan.timeoutId);
@@ -716,10 +751,14 @@ function finishLiveScanWithLockedSignal(s,candidate,level,reason="threshold"){
     qualified:true,
     locked:true,
     reason,
-    time:new Date().toLocaleTimeString()
+    time:new Date().toLocaleTimeString(),
+    generatedAt:Date.now(),
+    sourceId:`${s.symbol}-${Date.now()}-${Math.random().toString(36).slice(2,10)}`,
+    syncStatus:"SENDING"
   };
   s.liveScan=null;
   renderMarketMatrix();
+  syncLockedDigitEdgeSignal(s,candidate,level);
 }
 
 function finishLiveScanWithoutSignal(s){
@@ -864,6 +903,8 @@ function renderLiveSignalPanel(s){
 
   if(s.liveSignal?.locked){
     const level=Math.max(90,Math.min(100,s.liveSignal.level||90));
+    const syncLabels={SENDING:"SENDING TO MATCHSYNC…",ORDER_CONFIRMED:"DEMO ORDER CONFIRMED",EXECUTION_BLOCKED:"SIGNAL RECEIVED · EXECUTION BLOCKED",SIGNAL_ACCEPTED:"SIGNAL RECEIVED",LOGIN_REQUIRED:"CONNECT DERIV IN DIGITEDGE",SYNC_REJECTED:"SIGNAL REJECTED",SYNC_FAILED:"SYNC CONNECTION FAILED"};
+    const syncLabel=syncLabels[s.liveSignal.syncStatus]||"SYNC PENDING";
     return `<div class="live-scan-panel">
       <div class="live-scan-top">
         <div class="live-scan-title">Matches Live Signal Scanner</div>
@@ -877,6 +918,7 @@ function renderLiveSignalPanel(s){
           <div class="live-signal-sub">
             90–100% qualification reached · result frozen at ${s.liveSignal.time}
           </div>
+          <div class="live-signal-sub" style="margin-top:7px;font-weight:900;color:#ffd05b">DigitEdge sync: ${syncLabel}</div>
           <div class="live-level-track">
             <div class="live-level-fill" style="width:${level}%"></div>
           </div>
