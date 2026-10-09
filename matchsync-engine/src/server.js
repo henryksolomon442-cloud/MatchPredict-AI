@@ -84,6 +84,9 @@ app.get("/api/signal", (_req, res) => {
 app.get("/api/health", (_req, res) => res.json({ ok: true, mode: "PAPER_ONLY" }));
 app.post("/api/paper-execute", (req, res) => {
   const stake = req.body && req.body.stake !== undefined ? req.body.stake : 0.35;
+  const market = latestSignal ? markets[latestSignal.symbol] : null;
+  const marketFresh = Boolean(market && market.lastTickAt !== null && Date.now() - market.lastTickAt <= staleAfterMs);
+  if (!marketFresh) return res.status(409).json({ ok: false, reason: "NO_FRESH_LIVE_TICK" });
   const result = paperExecution.execute(latestSignal, stake);
   res.status(result.ok ? 200 : 409).json(result);
 });
