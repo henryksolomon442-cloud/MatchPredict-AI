@@ -16,8 +16,9 @@ class DerivPublicFeed {
     });
     this.ws.on("message", raw => {
       let msg; try { msg = JSON.parse(raw.toString()); } catch { return; }
-      if (msg.error) {
-        this.onStatus({ connected: true, message: "Feed warning: " + (msg.error.message || "subscription error") });
+      const apiError = msg.error || (Array.isArray(msg.errors) ? msg.errors[0] : null);
+      if (apiError) {
+        this.onStatus({ connected: true, message: "Feed warning: " + (apiError.message || apiError.code || "subscription error") });
         return;
       }
       if (msg.msg_type === "tick" && msg.tick) this.onTick(msg.tick);
