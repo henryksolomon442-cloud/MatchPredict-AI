@@ -9,7 +9,7 @@ A demo-first Deriv volatility scanner and synchronized match-digit / Even-Odd si
 - Open `http://localhost:3000`.
 
 ## Deploy on Render
-Create a **Web Service** from this GitHub repository and set **Root Directory** to `matchsync-engine`, **Build Command** to `npm install`, and **Start Command** to `npm start`. Add `DERIV_APP_ID` as an environment variable. Render deployment has not yet been performed.
+Create a **Web Service** from this GitHub repository and set **Root Directory** to `matchsync-engine`, **Build Command** to `npm install`, and **Start Command** to `npm start`. Add `DERIV_APP_ID` as an environment variable. This project is deployed as a separate Render Web Service. The dashboard reports live-tick freshness; verify the feed status before relying on scanner output.
 
 ## Safety / limitations
 - PAPER ONLY: this app does not place orders or connect to a trading account.
