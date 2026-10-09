@@ -105,7 +105,7 @@ app.get("/api/signal", (_req, res) => {
   res.set("Cache-Control", "no-store");
   res.json({ ok: true, signal: latestSignal, execution: "DISABLED_PAPER_ONLY" });
 });
-app.post("/api/ingest-signal", (req, res) => {
+app.post("/api/ingest-signal", async (req, res) => {
   // Server-side key required. This endpoint never places trades.
   if (!syncApiKey) return res.status(503).json({ ok: false, reason: "SYNC_DISABLED", message: "Configure SYNC_API_KEY on the server first." });
   const supplied = req.get("x-sync-key") || "";
@@ -143,7 +143,7 @@ app.post("/api/ingest-signal", (req, res) => {
     symbol, volatility: symbol, matchDigit, evenOdd,
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
     createdAt: now, receivedAt: now, sourceGeneratedAt: generatedAt,
-    expiresAt: now + ttlMs, mode: "PAPER_ONLY"
+    expiresAt: now + ttlMs, mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY"
   };
   if (sourceId) {
     receivedSourceIds.add(sourceId);
