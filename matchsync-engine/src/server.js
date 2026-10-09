@@ -21,7 +21,7 @@ const minConfidence = Number(process.env.MIN_CONFIDENCE || 0.55);
 const demoTradingEnabled = process.env.DEMO_TRADING_ENABLED === "true";
 const demoAutoExecute = process.env.DEMO_AUTO_EXECUTE === "true";
 const demoMaxStake = Math.min(0.35, Math.max(0.01, Number(process.env.DEMO_MAX_STAKE || 0.35)));
-const demoContractMode = process.env.DEMO_CONTRACT_MODE === "MATCH_DIGIT" ? "MATCH_DIGIT" : "EVEN_ODD";
+const demoContractMode = process.env.DEMO_CONTRACT_MODE === "EVEN_ODD" ? "EVEN_ODD" : "MATCH_DIGIT";
 const demoCooldownMs = Math.max(10000, Number(process.env.DEMO_COOLDOWN_MS || 10000));
 const demoMaxTradesPerDay = Math.max(1, Math.floor(Number(process.env.DEMO_MAX_TRADES_PER_DAY || 20)));
 const demoMaxDailyStake = Math.max(demoMaxStake, Number(process.env.DEMO_MAX_DAILY_STAKE || 7));
@@ -147,6 +147,7 @@ app.post("/api/ingest-signal", async (req, res) => {
     id: crypto.randomUUID(), sourceId: sourceId || null, source: "DIGITEDGE_SYNC",
     symbol, volatility: symbol, matchDigit, evenOdd,
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
+    signalLevel: Number.isFinite(Number(body.signalLevel)) ? Math.max(0, Math.min(100, Number(body.signalLevel))) : null,
     createdAt: now, receivedAt: now, sourceGeneratedAt: generatedAt,
     expiresAt: now + ttlMs, mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY"
   };
