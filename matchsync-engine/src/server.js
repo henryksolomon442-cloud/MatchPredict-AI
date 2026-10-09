@@ -200,7 +200,13 @@ app.post("/api/paper-execute", (req, res) => {
   res.status(result.ok ? 200 : 409).json(result);
 });
 app.get("/api/paper-history", (_req, res) => res.json({ mode: "PAPER_ONLY", history: paperExecution.getHistory() }));
-app.post("/api/stop", (_req, res) => {
+app.post("/api/stop", (req, res) => {
+  if (!syncApiKey) return res.status(503).json({ ok: false, reason: "ADMIN_KEY_NOT_CONFIGURED" });
+  const supplied = req.get("x-sync-key") || "";
+  const a = Buffer.from(supplied);
+  const b = Buffer.from(syncApiKey);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b))
+    return res.status(401).json({ ok: false, reason: "UNAUTHORIZED" });
   if (feed) feed.close();
   if (demoExecutor) demoExecutor.close();
   feedStatus = { connected: false, message: "Feed stopped by user." };
