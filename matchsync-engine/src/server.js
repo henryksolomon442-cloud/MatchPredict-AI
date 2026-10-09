@@ -106,7 +106,7 @@ app.get("/api/signal", (_req, res) => {
   if (!isFresh(latestSignal) || !freshMarket)
     return res.status(404).json({ ok: false, message: "No fresh signal or live market tick available." });
   res.set("Cache-Control", "no-store");
-  res.json({ ok: true, signal: latestSignal, execution: "DISABLED_PAPER_ONLY" });
+  res.json({ ok: true, signal: latestSignal, execution: "MARKET_SCANNER_ONLY_NO_EXECUTION" });
 });
 app.post("/api/ingest-signal", async (req, res) => {
   // Server-side key required. This endpoint never places trades.
@@ -156,16 +156,27 @@ app.post("/api/ingest-signal", async (req, res) => {
   }
   signalCount++;
   if (demoAutoExecute && demoTradingEnabled) {
-    if (!demoExecutor || !demoExecutor.ready) {
+    const utcDate = new Date().toISOString().slice(0, 10);
+    if (demoDaily.date !== utcDate) { demoDaily.date = utcDate; demoDaily.trades = 0; demoDaily.stake = 0; }
+    const requestedStake = body.stake !== undefined ? Number(body.stake) : demoMaxStake;
+    if (demoDaily.trades >= demoMaxTradesPerDay) {
+      lastDemoExecution = { status: "blocked", reason: "DAILY_TRADE_LIMIT", maxTrades: demoMaxTradesPerDay };
+    } else if (!Number.isFinite(requestedStake) || requestedStake <= 0 || requestedStake > demoMaxStake) {
+      lastDemoExecution = { status: "blocked", reason: "INVALID_STAKE", maxStake: demoMaxStake };
+    } else if (demoDaily.stake + requestedStake > demoMaxDailyStake) {
+      lastDemoExecution = { status: "blocked", reason: "DAILY_STAKE_LIMIT", remainingStake: Math.max(0, demoMaxDailyStake - demoDaily.stake) };
+    } else if (!demoExecutor || !demoExecutor.ready) {
       lastDemoExecution = { status: "blocked", reason: "DEMO_EXECUTOR_NOT_READY", executorStatus: demoExecutor ? demoExecutor.status : "missing_demo_token" };
     } else if (now - lastDemoExecutionAt < demoCooldownMs) {
       lastDemoExecution = { status: "blocked", reason: "DEMO_COOLDOWN", retryAfterMs: demoCooldownMs - (now - lastDemoExecutionAt) };
     } else {
       lastDemoExecutionAt = now;
       try {
-        const result = await demoExecutor.execute(latestSignal, Math.min(demoMaxStake, Number(body.stake || demoMaxStake)));
+        const result = await demoExecutor.execute(latestSignal, requestedStake);
         lastDemoExecution = result;
         if (result.ok) {
+          demoDaily.trades++;
+          demoDaily.stake = Number((demoDaily.stake + result.stake).toFixed(2));
           demoHistory.unshift(result);
           demoHistory.splice(100);
         }
