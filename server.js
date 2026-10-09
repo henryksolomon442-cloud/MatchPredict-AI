@@ -149,6 +149,42 @@ app.get("/api/auth/status",async(req,res)=>{
   }
 });
 
+app.post("/api/sync/digitedge",async(req,res)=>{
+  try{
+    // Only an authenticated DigitEdge session may forward a prediction.
+    const auth=req.session?.deriv;
+    if(!auth?.accessToken || (auth.expiresAt && Date.now()>=auth.expiresAt)){
+      req.session.deriv=null;
+      return res.status(401).json({ok:false,reason:"DERIV_LOGIN_REQUIRED",message:"Connect your Deriv account in DigitEdge first."});
+    }
+    const target=String(process.env.MATCHSYNC_URL||"").replace(/\\/+$/,"");
+    const key=String(process.env.MATCHSYNC_SYNC_KEY||"");
+    if(!target || !key)return res.status(503).json({ok:false,reason:"MATCHSYNC_NOT_CONFIGURED"});
+    const b=req.body||{};
+    const symbol=String(b.symbol||"").trim();
+    const matchDigit=Number(b.matchDigit);
+    const evenOdd=String(b.evenOdd||"").toUpperCase();
+    const generatedAt=Number(b.generatedAt);
+    const sourceId=String(b.sourceId||"").slice(0,128);
+    const now=Date.now();
+    if(!symbol || !/^[A-Za-z0-9_]{2,20}$/.test(symbol))return res.status(400).json({ok:false,reason:"INVALID_SYMBOL"});
+    if(!Number.isInteger(matchDigit)||matchDigit<0||matchDigit>9)return res.status(400).json({ok:false,reason:"INVALID_MATCH_DIGIT"});
+    if(!["EVEN","ODD"].includes(evenOdd))return res.status(400).json({ok:false,reason:"INVALID_EVEN_ODD"});
+    if(!Number.isFinite(generatedAt)||generatedAt>now+1000||now-generatedAt>10000)return res.status(409).json({ok:false,reason:"STALE_OR_INVALID_TIMESTAMP"});
+    if(!sourceId)return res.status(400).json({ok:false,reason:"SOURCE_ID_REQUIRED"});
+    const upstream=await fetch(target+"/api/ingest-signal",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-sync-key":key},
+      body:JSON.stringify({symbol,matchDigit,evenOdd,generatedAt,sourceId,signalLevel:Number.isFinite(Number(b.signalLevel))?Number(b.signalLevel):null})
+    });
+    const result=await upstream.json().catch(()=>({ok:false,reason:"INVALID_UPSTREAM_RESPONSE"}));
+    return res.status(upstream.status).json(result);
+  }catch(e){
+    console.error("DigitEdge signal forwarding failed:",e.message);
+    return res.status(502).json({ok:false,reason:"MATCHSYNC_FORWARD_FAILED"});
+  }
+});
+
 app.get("/api/access/status",async(req,res)=>{
   try{res.json({ok:true,...await accessStatus(req)})}
   catch(e){res.status(500).json({ok:false,error:"access_status_failed"})}
