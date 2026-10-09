@@ -765,18 +765,27 @@ function finishLiveScanWithoutSignal(s){
   if(!s?.liveScan)return;
   if(s.liveScan.timeoutId) clearTimeout(s.liveScan.timeoutId);
 
-  const livePreds=[...s.liveScan.preds];
-  const candidate=modeDigit(livePreds) ?? s.prediction;
+  const scan=s.liveScan;
+  const livePreds=[...scan.preds];
+  const fallback=modeDigit(livePreds) ?? s.prediction;
+  const candidate=Number.isInteger(scan.bestCandidate)?scan.bestCandidate:fallback;
   const level=Number.isInteger(candidate)
-    ? signalLevelForMarket(s,candidate,livePreds)
+    ? Math.max(scan.bestLevel||0,signalLevelForMarket(s,candidate,livePreds))
     : 0;
+
+  // Lock and forward only after the complete 30-second window, and only if
+  // the best candidate reaches the configured 90% qualification score.
+  if(Number.isInteger(candidate) && level>=90){
+    finishLiveScanWithLockedSignal(s,candidate,level,"30s_best_qualified");
+    return;
+  }
 
   s.liveSignal={
     pred:Number.isInteger(candidate)?candidate:null,
-    level,
+    level:Math.min(89,level),
     qualified:false,
     locked:false,
-    reason:"timeout",
+    reason:"timeout_below_threshold",
     time:new Date().toLocaleTimeString()
   };
   s.liveScan=null;
@@ -878,10 +887,10 @@ function renderLiveSignalPanel(s){
       <div class="live-signal-body">
         <div class="live-signal-digit wait"><div><div class="live-scan-spinner"></div></div></div>
         <div>
-          <div class="live-signal-label">Searching for a 90–100% qualified Match signal</div>
-          <div class="live-signal-level">${remaining}s MAX</div>
+          <div class="live-signal-label">Watching changing candidates · waiting for best rate</div>
+          <div class="live-signal-level">${remaining}s LEFT</div>
           <div class="live-signal-sub">
-            Best live level so far: ${best}% · signal releases immediately at 90%+
+            ${Number.isInteger(s.liveScan.bestCandidate)?`Current best candidate: MATCH ${s.liveScan.bestCandidate}`:"Evaluating digits…"} · best level so far: ${best}% · locks only after 30 seconds if level reaches 90%
           </div>
           <div class="live-level-track">
             <div class="live-level-fill wait" style="width:${pct}%"></div>
@@ -962,7 +971,7 @@ function renderLiveSignalPanel(s){
         <div class="live-signal-label">No live scan yet</div>
         <div class="live-signal-level">READY</div>
         <div class="live-signal-sub">
-          Press ANALYZE. The scan runs for up to 30 seconds and locks immediately at 90–100%.
+          Press ANALYZE. DigitEdge keeps updating candidates for the full 30 seconds, then locks the best one only if its level reaches 90%.
         </div>
         <div class="live-level-track"><div class="live-level-fill" style="width:0%"></div></div>
       </div>
@@ -1204,10 +1213,8 @@ function handle(m){
               s.liveScan.bestCandidate=candidate;
             }
 
-            // Release and freeze only when the internal signal-strength threshold reaches 90–100%.
-            if(liveLevel>=90){
-              finishLiveScanWithLockedSignal(s,candidate,liveLevel,"threshold");
-            }
+            // Keep scanning for the full 30 seconds. A 90% score is recorded,
+            // but it does not stop the scan early.
           }
         }
 
