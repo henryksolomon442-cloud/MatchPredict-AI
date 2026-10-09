@@ -22,7 +22,10 @@ const demoTradingEnabled = process.env.DEMO_TRADING_ENABLED === "true";
 const demoAutoExecute = process.env.DEMO_AUTO_EXECUTE === "true";
 const demoMaxStake = Math.min(0.35, Math.max(0.01, Number(process.env.DEMO_MAX_STAKE || 0.35)));
 const demoContractMode = process.env.DEMO_CONTRACT_MODE === "MATCH_DIGIT" ? "MATCH_DIGIT" : "EVEN_ODD";
-const demoCooldownMs = Math.max(5000, Number(process.env.DEMO_COOLDOWN_MS || 10000));
+const demoCooldownMs = Math.max(10000, Number(process.env.DEMO_COOLDOWN_MS || 10000));
+const demoMaxTradesPerDay = Math.max(1, Math.floor(Number(process.env.DEMO_MAX_TRADES_PER_DAY || 20)));
+const demoMaxDailyStake = Math.max(demoMaxStake, Number(process.env.DEMO_MAX_DAILY_STAKE || 7));
+const demoDaily = { date: new Date().toISOString().slice(0, 10), trades: 0, stake: 0 };
 const staleAfterMs = Math.max(3000, Number(process.env.STALE_AFTER_MS || 10000));
 const markets = Object.fromEntries(symbols.map(symbol => [symbol, { ticks: [], latestQuote: null, latestEpoch: null, lastTickAt: null, tickCount: 0 }]));
 let feedStatus = { connected: false, message: appId ? "Waiting for feed…" : "Set DERIV_APP_ID to connect." };
@@ -88,7 +91,7 @@ app.get("/api/status", (_req, res) => {
   res.json({
     app: "MatchSync Engine", mode: demoTradingEnabled ? "DEMO_EXECUTION_CONFIGURED" : "PAPER_ONLY",
     tradingEnabled: Boolean(demoTradingEnabled && demoAutoExecute && demoExecutor && demoExecutor.ready),
-    demoExecution: { enabled: demoTradingEnabled, autoExecute: demoAutoExecute, executorStatus: demoExecutor ? demoExecutor.status : "missing_demo_token_or_disabled", contractMode: demoContractMode, maxStake: demoMaxStake, cooldownMs: demoCooldownMs, lastResult: lastDemoExecution },
+    demoExecution: { enabled: demoTradingEnabled, autoExecute: demoAutoExecute, executorStatus: demoExecutor ? demoExecutor.status : "missing_demo_token_or_disabled", contractMode: demoContractMode, maxStake: demoMaxStake, cooldownMs: demoCooldownMs, dailyRisk: { ...demoDaily, maxTrades: demoMaxTradesPerDay, maxStakeTotal: demoMaxDailyStake }, lastResult: lastDemoExecution },
     uptimeSeconds: Math.floor((now - startedAt) / 1000),
     feedStatus: { ...feedStatus, liveTickSeen, lastTickAgeMs: ageMs, staleAfterMs }, signalCount,
     digitEdgeSync: { enabled: Boolean(syncApiKey), endpoint: "/api/ingest-signal", mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY" },
@@ -130,6 +133,8 @@ app.post("/api/ingest-signal", async (req, res) => {
     return res.status(400).json({ ok: false, reason: "INVALID_EVEN_ODD" });
   if (!Number.isFinite(generatedAt) || generatedAt > now + 1000 || now - generatedAt > 10000)
     return res.status(409).json({ ok: false, reason: "STALE_OR_INVALID_TIMESTAMP", maxAgeMs: 10000 });
+  if (demoAutoExecute && !sourceId)
+    return res.status(400).json({ ok: false, reason: "SOURCE_ID_REQUIRED_FOR_AUTO_EXECUTION" });
   if (sourceId && receivedSourceIds.has(sourceId))
     return res.status(409).json({ ok: false, reason: "DUPLICATE_SOURCE_ID" });
 
