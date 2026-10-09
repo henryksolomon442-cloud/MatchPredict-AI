@@ -103,9 +103,14 @@ class DerivDemoExecutor {
     const proposalMsg = await this.request(proposalReq, 3500);
     if (!proposalMsg.proposal || !proposalMsg.proposal.id)
       throw new Error("Deriv did not return a valid price proposal");
+    if (Date.now() > signal.expiresAt)
+      throw new Error("Signal expired while waiting for proposal; no order was bought");
+    const askPrice = Number(proposalMsg.proposal.ask_price);
+    if (!Number.isFinite(askPrice) || askPrice <= 0)
+      throw new Error("Deriv returned an invalid proposal price");
     const buyMsg = await this.request({
       buy: proposalMsg.proposal.id,
-      price: Number(proposalMsg.proposal.ask_price),
+      price: askPrice,
       passthrough: { source: "MatchSyncEngine", signal_id: signal.id || "", mode: "DEMO_ONLY" }
     }, 3500);
     if (!buyMsg.buy || !buyMsg.buy.contract_id)
