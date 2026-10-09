@@ -48,6 +48,7 @@ function handleTick(tick) {
   market.latestEpoch = tick.epoch || Math.floor(now / 1000);
   market.lastTickAt = now;
   market.tickCount++;
+  if (market.tickCount === 1 || market.tickCount % 100 === 0) console.log("Market tick received:", symbol, "count:", market.tickCount);
   lastTickAt = now;
   market.ticks.push({ digit, quote: String(tick.quote), epoch: market.latestEpoch });
   if (market.ticks.length > windowSize) market.ticks.splice(0, market.ticks.length - windowSize);
@@ -154,6 +155,6 @@ app.listen(port, () => {
     feedStatus = { connected: false, message: "Set DERIV_APP_ID in environment to start market feed." };
     return;
   }
-  feed = new DerivPublicFeed(appId, symbols, handleTick, status => { feedStatus = status; });
+  feed = new DerivPublicFeed(appId, symbols, handleTick, status => { feedStatus = status; console.log("Deriv feed status:", status.message); });
   feed.connect();
 });
