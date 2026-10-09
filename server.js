@@ -157,7 +157,8 @@ app.post("/api/sync/digitedge",async(req,res)=>{
       req.session.deriv=null;
       return res.status(401).json({ok:false,reason:"DERIV_LOGIN_REQUIRED",message:"Connect your Deriv account in DigitEdge first."});
     }
-    const target=String(process.env.MATCHSYNC_URL||"").replace(/\\/+$/,"");
+    let target=String(process.env.MATCHSYNC_URL||"");
+    while(target.endsWith("/")) target=target.slice(0,-1);
     const key=String(process.env.MATCHSYNC_SYNC_KEY||"");
     if(!target || !key)return res.status(503).json({ok:false,reason:"MATCHSYNC_NOT_CONFIGURED"});
     const b=req.body||{};
