@@ -14,7 +14,7 @@ const symbols = (process.env.SYMBOLS || "1HZ10V,1HZ25V,1HZ50V,1HZ75V,1HZ100V").s
 const windowSize = Math.max(40, Number(process.env.WINDOW || 120));
 const minSamples = Math.max(20, Number(process.env.MIN_SAMPLES || 40));
 const ttlMs = Math.max(1000, Number(process.env.SIGNAL_TTL_MS || 5000));
-const minConfidence = Number(process.env.MIN_CONFIDENCE || 0.65);
+const minConfidence = Number(process.env.MIN_CONFIDENCE || 0.55);
 const staleAfterMs = Math.max(3000, Number(process.env.STALE_AFTER_MS || 10000));
 const markets = Object.fromEntries(symbols.map(symbol => [symbol, { ticks: [], latestQuote: null, latestEpoch: null, lastTickAt: null, tickCount: 0 }]));
 let feedStatus = { connected: false, message: appId ? "Waiting for feed…" : "Set DERIV_APP_ID to connect." };
@@ -50,7 +50,7 @@ function handleTick(tick) {
   if (market.ticks.length > windowSize) market.ticks.splice(0, market.ticks.length - windowSize);
   const best = getRankedMarkets().find(m => m.ready && m.dataFresh);
   if (!best) return;
-  const same = latestSignal && latestSignal.symbol === best.symbol &&
+  const same = isFresh(latestSignal) && latestSignal.symbol === best.symbol &&
     latestSignal.matchDigit === best.topDigit && latestSignal.evenOdd === best.recentParity;
   if (!same && best.confidence >= minConfidence) {
     latestSignal = makeSignal(best.symbol, best, ttlMs);
