@@ -7,7 +7,7 @@ class DerivPublicFeed {
   }
   connect() {
     this.closedByUser = false;
-    const url = "wss://ws.derivws.com/websockets/v3?app_id=" + encodeURIComponent(this.appId);
+    const url = "wss://api.derivws.com/trading/v1/options/ws/public";
     this.onStatus({ connected: false, message: "Connecting to public tick feed…" });
     this.ws = new WebSocket(url);
     this.ws.on("open", () => {
