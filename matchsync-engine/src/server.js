@@ -40,7 +40,10 @@ if (demoTradingEnabled && process.env.DERIV_DEMO_TOKEN && appId) {
     appId, token: process.env.DERIV_DEMO_TOKEN, maxStake: demoMaxStake,
     contractMode: demoContractMode, durationTicks: Math.max(1, Number(process.env.DEMO_DURATION_TICKS || 1))
   });
-  demoExecutor.connect();
+  demoExecutor.connect().catch(error => {
+    lastDemoExecution = { status: "authorization_error", reason: error.message };
+    console.error("Deriv demo executor initialization failed:", error.message);
+  });
 }
 const paperExecution = new PaperExecution({
   maxStake: Number(process.env.PAPER_MAX_STAKE || 0.35),
