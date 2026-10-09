@@ -193,8 +193,7 @@ app.post("/api/stop", (_req, res) => {
 app.listen(port, () => {
   console.log("MatchSync Engine listening on port " + port);
   if (!appId || appId === "YOUR_APP_ID") {
-    feedStatus = { connected: false, message: "Set DERIV_APP_ID in environment to start market feed." };
-    return;
+    feedStatus = { connected: false, message: "Public feed can run without an app ID; set a registered DERIV_APP_ID to enable authenticated demo execution." };
   }
   feed = new DerivPublicFeed(appId, symbols, handleTick, status => { feedStatus = status; console.log("Deriv feed status:", status.message); });
   feed.connect();
