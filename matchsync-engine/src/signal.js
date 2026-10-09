@@ -6,7 +6,7 @@ function makeSignal(symbol, analysis, ttlMs) {
     matchDigit: analysis.topDigit, evenOdd: analysis.recentParity,
     confidence: analysis.confidence, score: analysis.score,
     samples: analysis.samples, createdAt, expiresAt: createdAt + ttlMs,
-    mode: "PAPER_ONLY"
+    mode: "MARKET_SCANNER_ONLY"
   };
 }
 function isFresh(signal) {
