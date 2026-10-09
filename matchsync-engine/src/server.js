@@ -6,6 +6,7 @@ const { DerivPublicFeed } = require("./derivPublic");
 const { lastDigit, analyzeMarket } = require("./analyzer");
 const { makeSignal, isFresh } = require("./signal");
 const { PaperExecution } = require("./paperExecution");
+const { DerivDemoExecutor } = require("./derivDemoExecution");
 
 const app = express();
 app.use(express.json({ limit: "16kb" }));
@@ -17,11 +18,27 @@ const windowSize = Math.max(40, Number(process.env.WINDOW || 120));
 const minSamples = Math.max(20, Number(process.env.MIN_SAMPLES || 40));
 const ttlMs = Math.max(1000, Number(process.env.SIGNAL_TTL_MS || 5000));
 const minConfidence = Number(process.env.MIN_CONFIDENCE || 0.55);
+const demoTradingEnabled = process.env.DEMO_TRADING_ENABLED === "true";
+const demoAutoExecute = process.env.DEMO_AUTO_EXECUTE === "true";
+const demoMaxStake = Math.min(0.35, Math.max(0.01, Number(process.env.DEMO_MAX_STAKE || 0.35)));
+const demoContractMode = process.env.DEMO_CONTRACT_MODE === "MATCH_DIGIT" ? "MATCH_DIGIT" : "EVEN_ODD";
+const demoCooldownMs = Math.max(5000, Number(process.env.DEMO_COOLDOWN_MS || 10000));
 const staleAfterMs = Math.max(3000, Number(process.env.STALE_AFTER_MS || 10000));
 const markets = Object.fromEntries(symbols.map(symbol => [symbol, { ticks: [], latestQuote: null, latestEpoch: null, lastTickAt: null, tickCount: 0 }]));
 let feedStatus = { connected: false, message: appId ? "Waiting for feed…" : "Set DERIV_APP_ID to connect." };
 let latestSignal = null, signalCount = 0, startedAt = Date.now(), feed = null, lastTickAt = null;
 const receivedSourceIds = new Set();
+const demoHistory = [];
+let lastDemoExecutionAt = 0;
+let demoExecutor = null;
+let lastDemoExecution = { status: "disabled", message: "Demo execution is not configured." };
+if (demoTradingEnabled && process.env.DERIV_DEMO_TOKEN && appId) {
+  demoExecutor = new DerivDemoExecutor({
+    appId, token: process.env.DERIV_DEMO_TOKEN, maxStake: demoMaxStake,
+    contractMode: demoContractMode, durationTicks: Math.max(1, Number(process.env.DEMO_DURATION_TICKS || 1))
+  });
+  demoExecutor.connect();
+}
 const paperExecution = new PaperExecution({
   maxStake: Number(process.env.PAPER_MAX_STAKE || 0.35),
   cooldownMs: Number(process.env.PAPER_COOLDOWN_MS || 1000)
@@ -69,10 +86,12 @@ app.get("/api/status", (_req, res) => {
   const signalMarketFresh = Boolean(signalMarket && signalMarket.lastTickAt !== null && now - signalMarket.lastTickAt <= staleAfterMs);
   res.set("Cache-Control", "no-store");
   res.json({
-    app: "MatchSync Engine", mode: "PAPER_ONLY", tradingEnabled: false,
+    app: "MatchSync Engine", mode: demoTradingEnabled ? "DEMO_EXECUTION_CONFIGURED" : "PAPER_ONLY",
+    tradingEnabled: Boolean(demoTradingEnabled && demoAutoExecute && demoExecutor && demoExecutor.ready),
+    demoExecution: { enabled: demoTradingEnabled, autoExecute: demoAutoExecute, executorStatus: demoExecutor ? demoExecutor.status : "missing_demo_token_or_disabled", contractMode: demoContractMode, maxStake: demoMaxStake, cooldownMs: demoCooldownMs, lastResult: lastDemoExecution },
     uptimeSeconds: Math.floor((now - startedAt) / 1000),
     feedStatus: { ...feedStatus, liveTickSeen, lastTickAgeMs: ageMs, staleAfterMs }, signalCount,
-    digitEdgeSync: { enabled: Boolean(syncApiKey), endpoint: "/api/ingest-signal", mode: "PAPER_ONLY" },
+    digitEdgeSync: { enabled: Boolean(syncApiKey), endpoint: "/api/ingest-signal", mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY" },
     latestSignal: isFresh(latestSignal) && signalMarketFresh ? latestSignal : null,
     rankedMarkets: getRankedMarkets(),
     settings: { windowSize, minSamples, ttlMs, minConfidence, staleAfterMs, symbols }
@@ -131,10 +150,31 @@ app.post("/api/ingest-signal", (req, res) => {
     if (receivedSourceIds.size > 1000) receivedSourceIds.delete(receivedSourceIds.values().next().value);
   }
   signalCount++;
+  if (demoAutoExecute && demoTradingEnabled) {
+    if (!demoExecutor || !demoExecutor.ready) {
+      lastDemoExecution = { status: "blocked", reason: "DEMO_EXECUTOR_NOT_READY", executorStatus: demoExecutor ? demoExecutor.status : "missing_demo_token" };
+    } else if (now - lastDemoExecutionAt < demoCooldownMs) {
+      lastDemoExecution = { status: "blocked", reason: "DEMO_COOLDOWN", retryAfterMs: demoCooldownMs - (now - lastDemoExecutionAt) };
+    } else {
+      lastDemoExecutionAt = now;
+      try {
+        const result = await demoExecutor.execute(latestSignal, Math.min(demoMaxStake, Number(body.stake || demoMaxStake)));
+        lastDemoExecution = result;
+        if (result.ok) {
+          demoHistory.unshift(result);
+          demoHistory.splice(100);
+        }
+      } catch (e) {
+        lastDemoExecution = { ok: false, status: "execution_error", reason: e.message };
+      }
+    }
+  }
   res.set("Cache-Control", "no-store");
-  return res.status(202).json({ ok: true, accepted: true, signal: latestSignal, execution: "DISABLED_PAPER_ONLY" });
+  return res.status(202).json({ ok: true, accepted: true, signal: latestSignal,
+    execution: lastDemoExecution, mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY" });
 });
-app.get("/api/health", (_req, res) => res.json({ ok: true, mode: "PAPER_ONLY" }));
+app.get("/api/demo-history", (_req, res) => res.json({ mode: "DEMO_ONLY", history: demoHistory }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY" }));
 app.post("/api/paper-execute", (req, res) => {
   const stake = req.body && req.body.stake !== undefined ? req.body.stake : 0.35;
   const market = latestSignal ? markets[latestSignal.symbol] : null;
@@ -146,6 +186,7 @@ app.post("/api/paper-execute", (req, res) => {
 app.get("/api/paper-history", (_req, res) => res.json({ mode: "PAPER_ONLY", history: paperExecution.getHistory() }));
 app.post("/api/stop", (_req, res) => {
   if (feed) feed.close();
+  if (demoExecutor) demoExecutor.close();
   feedStatus = { connected: false, message: "Feed stopped by user." };
   res.json({ ok: true, message: "Public feed stopped. No trades were placed." });
 });
