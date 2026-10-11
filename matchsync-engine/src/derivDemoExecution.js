@@ -156,6 +156,20 @@ class DerivDemoExecutor {
       return { ok: false, reason: "STAKE_OUT_OF_ALLOWED_RANGE", maxStake: this.maxStake };
 
     const startedAt = Date.now();
+    // Keep the user's end-to-end target under 7 seconds. Allow at most 4 seconds
+    // from DigitEdge's prediction to the start of the buy request, leaving room
+    // for Deriv's buy response. If the signal is already too old, do not trade.
+    const sourceGeneratedAt = Number(signal.sourceGeneratedAt);
+    if (!Number.isFinite(sourceGeneratedAt) || sourceGeneratedAt > startedAt + 1000) {
+      return { ok: false, status: "blocked", reason: "INVALID_SOURCE_TIMESTAMP" };
+    }
+    if (startedAt - sourceGeneratedAt >= 4000) {
+      return {
+        ok: false, status: "blocked", reason: "LATENCY_BUDGET_EXCEEDED",
+        endToEndMs: startedAt - sourceGeneratedAt, maxBeforeBuyMs: 4000
+      };
+    }
+
     const contractType = this.contractMode === "EVEN_ODD"
       ? (signal.evenOdd === "EVEN" ? "DIGITEVEN" : "DIGITODD")
       : "DIGITMATCH";
@@ -181,6 +195,16 @@ class DerivDemoExecutor {
     if (!Number.isFinite(askPrice) || askPrice <= 0)
       throw new Error("Deriv returned an invalid proposal price");
 
+    const ageBeforeBuy = Date.now() - sourceGeneratedAt;
+    // Do not start a purchase if the remaining round trip could push the
+    // prediction-to-execution path beyond the 7-second target.
+    if (ageBeforeBuy >= 4000) {
+      return {
+        ok: false, status: "blocked", reason: "LATENCY_BUDGET_EXCEEDED",
+        endToEndMs: ageBeforeBuy, maxBeforeBuyMs: 4000
+      };
+    }
+
     const buyMsg = await this.request({
       buy: proposalMsg.proposal.id,
       price: askPrice,
@@ -202,6 +226,7 @@ class DerivDemoExecutor {
       stake,
       currency: this.currency,
       executionMs: Date.now() - startedAt,
+      endToEndMs: Date.now() - sourceGeneratedAt,
       createdAt: Date.now()
     };
   }
