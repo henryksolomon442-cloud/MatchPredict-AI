@@ -35,15 +35,36 @@ const demoHistory = [];
 let lastDemoExecutionAt = 0;
 let demoExecutor = null;
 let lastDemoExecution = { status: "disabled", message: "Demo execution is not configured." };
+let demoConnectInProgress = false;
+async function connectDemoExecutor() {
+  if (!demoExecutor || demoExecutor.ready || demoConnectInProgress) return;
+  demoConnectInProgress = true;
+  try {
+    await demoExecutor.connect();
+    console.log("Deriv demo executor connected and ready.");
+  } catch (error) {
+    lastDemoExecution = {
+      status: "authorization_error",
+      reason: error.message,
+      executorStatus: demoExecutor ? demoExecutor.status : "missing_demo_token"
+    };
+    console.error("Deriv demo executor connection failed:", error.message);
+  } finally {
+    demoConnectInProgress = false;
+  }
+}
+
 if (demoTradingEnabled && process.env.DERIV_DEMO_TOKEN && appId) {
   demoExecutor = new DerivDemoExecutor({
     appId, token: process.env.DERIV_DEMO_TOKEN, maxStake: demoMaxStake,
     contractMode: demoContractMode, durationTicks: Math.max(1, Number(process.env.DEMO_DURATION_TICKS || 1))
   });
-  demoExecutor.connect().catch(error => {
-    lastDemoExecution = { status: "authorization_error", reason: error.message };
-    console.error("Deriv demo executor initialization failed:", error.message);
-  });
+  connectDemoExecutor();
+  // Reconnect after a dropped Deriv demo WebSocket; never enable live-account execution.
+  const demoReconnectTimer = setInterval(() => {
+    if (demoExecutor && !demoExecutor.ready) connectDemoExecutor();
+  }, 5000);
+  if (typeof demoReconnectTimer.unref === "function") demoReconnectTimer.unref();
 }
 const paperExecution = new PaperExecution({
   maxStake: Number(process.env.PAPER_MAX_STAKE || 0.35),
