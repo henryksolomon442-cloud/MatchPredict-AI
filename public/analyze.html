@@ -971,7 +971,7 @@ function renderLiveSignalPanel(s){
         <div class="live-signal-label">No live scan yet</div>
         <div class="live-signal-level">READY</div>
         <div class="live-signal-sub">
-          Press ANALYZE. DigitEdge keeps updating candidates for the full 30 seconds, then locks the best one only if its level reaches 90%.
+          Press ANALYZE. DigitEdge stops immediately when all 4 models agree on the same digit and sends it to MatchSync. If 4/4 is not reached, scanning continues for up to 30 seconds.
         </div>
         <div class="live-level-track"><div class="live-level-fill" style="width:0%"></div></div>
       </div>
@@ -1213,8 +1213,13 @@ function handle(m){
               s.liveScan.bestCandidate=candidate;
             }
 
-            // Keep scanning for the full 30 seconds. A 90% score is recorded,
-            // but it does not stop the scan early.
+            // A genuine 4/4 model agreement ends this scan immediately.
+            // Use the current agreed prediction, not the rolling mode of older predictions.
+            if(s.analysis?.agreement===4 && s.analysis?.pred===s.prediction){
+              const confirmedDigit=s.prediction;
+              const confirmedLevel=signalLevelForMarket(s,confirmedDigit,s.liveScan.preds);
+              finishLiveScanWithLockedSignal(s,confirmedDigit,confirmedLevel,"4_of_4_early_confirmed");
+            }
           }
         }
 
