@@ -128,7 +128,7 @@ class DerivDemoExecutor {
     });
   }
 
-  request(payload, timeoutMs = 3500) {
+  request(payload, timeoutMs = 2500) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.ready || !this.isVirtual)
       return Promise.reject(new Error("Deriv demo connection is not ready"));
     const req_id = this.nextReqId++;
@@ -171,7 +171,7 @@ class DerivDemoExecutor {
     };
     if (contractType === "DIGITMATCH") proposalReq.barrier = String(signal.matchDigit);
 
-    const proposalMsg = await this.request(proposalReq, 3500);
+    const proposalMsg = await this.request(proposalReq, 2500);
     if (!proposalMsg.proposal || !proposalMsg.proposal.id)
       throw new Error("Deriv did not return a valid price proposal");
     if (Date.now() > signal.expiresAt)
@@ -185,7 +185,7 @@ class DerivDemoExecutor {
       buy: proposalMsg.proposal.id,
       price: askPrice,
       passthrough: { source: "MatchSyncEngine", signal_id: signal.id || "", mode: "DEMO_ONLY" }
-    }, 3500);
+    }, 2500);
     if (!buyMsg.buy || !buyMsg.buy.contract_id)
       throw new Error("Deriv did not confirm a purchased contract");
 
