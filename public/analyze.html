@@ -773,20 +773,15 @@ function finishLiveScanWithoutSignal(s){
     ? Math.max(scan.bestLevel||0,signalLevelForMarket(s,candidate,livePreds))
     : 0;
 
-  // Lock and forward only after the complete 30-second window, and only if
-  // the best candidate reaches the configured 90% qualification score.
-  if(Number.isInteger(candidate) && level>=90){
-    finishLiveScanWithLockedSignal(s,candidate,level,"30s_best_qualified");
-    return;
-  }
-
+  // Never forward a fallback or a percentage score: only a 4/4 consensus qualifies.
   s.liveSignal={
     pred:Number.isInteger(candidate)?candidate:null,
-    level:Math.min(89,level),
+    level,
     qualified:false,
     locked:false,
-    reason:"timeout_below_threshold",
-    time:new Date().toLocaleTimeString()
+    reason:"timeout_without_4_of_4",
+    time:new Date().toLocaleTimeString(),
+    syncStatus:"NO_4_OF_4"
   };
   s.liveScan=null;
   renderMarketMatrix();
@@ -809,6 +804,7 @@ window.analyzeLiveMarket=function(symbol){
   s.liveScan={
     scanId,
     duration:30,
+    minDurationMs:15000,
     preds:[],
     started:Date.now(),
     bestLevel:0,
@@ -971,7 +967,7 @@ function renderLiveSignalPanel(s){
         <div class="live-signal-label">No live scan yet</div>
         <div class="live-signal-level">READY</div>
         <div class="live-signal-sub">
-          Press ANALYZE. DigitEdge stops immediately when all 4 models agree on the same digit and sends it to MatchSync. If 4/4 is not reached, scanning continues for up to 30 seconds.
+          Press ANALYZE. DigitEdge scans for at least 15 seconds and at most 30 seconds. After 15 seconds, it sends only when all 4 models agree on the same digit (4/4). If no 4/4 appears by 30 seconds, no signal is sent.
         </div>
         <div class="live-level-track"><div class="live-level-fill" style="width:0%"></div></div>
       </div>
@@ -1213,12 +1209,15 @@ function handle(m){
               s.liveScan.bestCandidate=candidate;
             }
 
-            // A genuine 4/4 model agreement ends this scan immediately.
-            // Use the current agreed prediction, not the rolling mode of older predictions.
-            if(s.analysis?.agreement===4 && s.analysis?.pred===s.prediction){
+            // Enforce a 15-second minimum scan. After that, forward immediately
+            // on a current 4/4 consensus; otherwise keep scanning until 30 seconds.
+            const elapsed=Date.now()-s.liveScan.started;
+            if(elapsed>=s.liveScan.minDurationMs &&
+               s.analysis?.agreement===4 &&
+               s.analysis?.pred===s.prediction){
               const confirmedDigit=s.prediction;
               const confirmedLevel=signalLevelForMarket(s,confirmedDigit,s.liveScan.preds);
-              finishLiveScanWithLockedSignal(s,confirmedDigit,confirmedLevel,"4_of_4_early_confirmed");
+              finishLiveScanWithLockedSignal(s,confirmedDigit,confirmedLevel,"4_of_4_after_15s");
             }
           }
         }
