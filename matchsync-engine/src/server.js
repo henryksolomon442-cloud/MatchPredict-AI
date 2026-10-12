@@ -107,10 +107,12 @@ function handleTick(tick) {
   if (!best) return;
   const bestParity = Number.isInteger(best.topDigit)
     ? (best.topDigit % 2 === 0 ? "EVEN" : "ODD") : null;
+  const digitEdgeSignalActive = isFresh(latestSignal) && latestSignal.source === "DIGITEDGE_SYNC";
   const same = isFresh(latestSignal) && latestSignal.source === "MARKET_SCANNER" &&
     latestSignal.symbol === best.symbol && latestSignal.matchDigit === best.topDigit &&
     latestSignal.evenOdd === bestParity;
-  if (!same && best.confidence >= minConfidence) {
+  // Never let the background scanner overwrite a fresh DigitEdge prediction.
+  if (!digitEdgeSignalActive && !same && best.confidence >= minConfidence) {
     latestSignal = makeSignal(best.symbol, best, ttlMs);
     signalCount++;
   }
