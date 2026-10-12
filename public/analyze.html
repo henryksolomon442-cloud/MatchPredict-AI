@@ -693,7 +693,10 @@ function signalLevelForMarket(s,pred,livePreds=[]){
   const gap=(predRow&&second)?Math.max(0,predRow.score-second.score):0;
   const gapQuality=Math.min(1,gap/0.04);
 
-  const level=100*(0.45*agreeForPred + 0.20*stability + 0.20*liveConfirm + 0.10*sample + 0.05*gapQuality);
+  // Weight stability, repeated live confirmation, sample size, and model separation
+  // strongly enough that an exceptional 3/4 signal can reach the 90 qualification level.
+  // This remains a model-strength score, not a calibrated win probability.
+  const level=100*(0.35*agreeForPred + 0.25*stability + 0.20*liveConfirm + 0.10*sample + 0.10*gapQuality);
   return Math.max(0,Math.min(100,Math.round(level)));
 }
 
