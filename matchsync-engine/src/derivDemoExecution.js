@@ -17,6 +17,8 @@ class DerivDemoExecutor {
     this.nextReqId = 1;
     this.pending = new Map();
     this.status = "not_configured";
+    this.keepaliveTimer = null;
+    this.connectionGeneration = 0;
   }
 
   async connect() {
@@ -74,20 +76,34 @@ class DerivDemoExecutor {
     }
 
     this.status = "connecting_demo_websocket";
+    const generation = ++this.connectionGeneration;
     return new Promise((resolve, reject) => {
       let settled = false;
-      this.ws = new WebSocket(wsUrl);
+      const socket = new WebSocket(wsUrl);
+      this.ws = socket;
 
-      this.ws.on("open", () => {
+      socket.on("open", () => {
+        if (generation !== this.connectionGeneration || socket !== this.ws) return;
         this.ready = true;
         this.isVirtual = true;
         this.status = "ready_demo_only";
         settled = true;
-        console.log("Deriv authenticated demo WebSocket is ready.");
+        if (this.keepaliveTimer) clearInterval(this.keepaliveTimer);
+        // Deriv WebSocket sessions can be closed when left idle. Send the API ping
+        // regularly so a healthy demo session stays alive between trade signals.
+        this.keepaliveTimer = setInterval(() => {
+          if (socket === this.ws && this.ready && socket.readyState === WebSocket.OPEN) {
+            try { socket.send(JSON.stringify({ ping: 1 })); }
+            catch (error) { console.warn("Deriv demo keepalive send failed:", error.message); }
+          }
+        }, 25000);
+        if (typeof this.keepaliveTimer.unref === "function") this.keepaliveTimer.unref();
+        console.log("Deriv authenticated demo WebSocket is ready; keepalive enabled.");
         resolve(this);
       });
 
-      this.ws.on("message", raw => {
+      socket.on("message", raw => {
+        if (generation !== this.connectionGeneration || socket !== this.ws) return;
         let msg;
         try { msg = JSON.parse(raw.toString()); } catch { return; }
         const reqId = msg.req_id;
@@ -101,7 +117,8 @@ class DerivDemoExecutor {
         }
       });
 
-      this.ws.on("error", error => {
+      socket.on("error", error => {
+        if (generation !== this.connectionGeneration || socket !== this.ws) return;
         this.status = "connection_error";
         console.error("Deriv demo WebSocket error:", error.message);
         if (!settled) {
@@ -110,11 +127,14 @@ class DerivDemoExecutor {
         }
       });
 
-      this.ws.on("close", () => {
+      socket.on("close", (code, reason) => {
+        if (generation !== this.connectionGeneration || socket !== this.ws) return;
+        if (this.keepaliveTimer) { clearInterval(this.keepaliveTimer); this.keepaliveTimer = null; }
         this.ready = false;
         this.isVirtual = false;
         if (this.status !== "blocked_non_demo_account" && this.status !== "blocked_non_demo_endpoint")
           this.status = "disconnected";
+        console.warn("Deriv demo WebSocket closed:", code, reason ? reason.toString().slice(0, 160) : "(no reason)");
         for (const [id, item] of this.pending) {
           clearTimeout(item.timer);
           item.reject(new Error("Deriv demo connection closed"));
@@ -234,6 +254,8 @@ class DerivDemoExecutor {
   close() {
     this.ready = false;
     this.isVirtual = false;
+    this.connectionGeneration++;
+    if (this.keepaliveTimer) { clearInterval(this.keepaliveTimer); this.keepaliveTimer = null; }
     if (this.ws) this.ws.close();
   }
 }
