@@ -112,8 +112,13 @@ class DerivDemoExecutor {
           this.pending.delete(reqId);
           clearTimeout(item.timer);
           const apiError = msg.error || (Array.isArray(msg.errors) ? msg.errors[0] : null);
-          if (apiError) item.reject(new Error(apiError.message || apiError.code || "Deriv API error"));
-          else item.resolve(msg);
+          if (apiError) {
+            const error = new Error(apiError.message || apiError.code || "Deriv API error");
+            error.code = apiError.code || null;
+            error.details = apiError.details || null;
+            error.derivEchoReq = msg.echo_req || null;
+            item.reject(error);
+          } else item.resolve(msg);
         }
       });
 
@@ -205,7 +210,19 @@ class DerivDemoExecutor {
     };
     if (contractType === "DIGITMATCH") proposalReq.barrier = String(signal.matchDigit);
 
-    const proposalMsg = await this.request(proposalReq, 2500);
+    let proposalMsg;
+    try {
+      proposalMsg = await this.request(proposalReq, 2500);
+    } catch (error) {
+      console.error("[DerivDemoExecutor] Proposal request failed", JSON.stringify({
+        stage: "proposal", symbol: signal.symbol, contractType, currency: this.currency,
+        duration: this.durationTicks, amount: stake, barrier: proposalReq.barrier ?? null,
+        errorCode: error.code || null, error: error.message, details: error.details || null,
+        echoReq: error.derivEchoReq || null
+      }));
+      error.message = "Proposal request failed: " + error.message;
+      throw error;
+    }
     if (!proposalMsg.proposal || !proposalMsg.proposal.id)
       throw new Error("Deriv did not return a valid price proposal");
     if (Date.now() > signal.expiresAt)
@@ -225,11 +242,23 @@ class DerivDemoExecutor {
       };
     }
 
-    const buyMsg = await this.request({
-      buy: proposalMsg.proposal.id,
-      price: askPrice,
-      passthrough: { source: "MatchSyncEngine", signal_id: signal.id || "", mode: "DEMO_ONLY" }
-    }, 2500);
+    let buyMsg;
+    try {
+      buyMsg = await this.request({
+        buy: proposalMsg.proposal.id,
+        price: askPrice,
+        passthrough: { source: "MatchSyncEngine", signal_id: signal.id || "", mode: "DEMO_ONLY" }
+      }, 2500);
+    } catch (error) {
+      console.error("[DerivDemoExecutor] Buy request failed", JSON.stringify({
+        stage: "buy", symbol: signal.symbol, contractType, currency: this.currency,
+        proposalIdPresent: Boolean(proposalMsg.proposal.id), askPrice,
+        errorCode: error.code || null, error: error.message, details: error.details || null,
+        echoReq: error.derivEchoReq || null
+      }));
+      error.message = "Buy request failed: " + error.message;
+      throw error;
+    }
     if (!buyMsg.buy || !buyMsg.buy.contract_id)
       throw new Error("Deriv did not confirm a purchased contract");
 
