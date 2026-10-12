@@ -142,18 +142,30 @@ app.post("/api/ingest-signal", async (req, res) => {
     return res.status(401).json({ ok: false, reason: "UNAUTHORIZED" });
 
   const body = req.body || {};
-  const symbol = typeof body.symbol === "string" ? body.symbol.trim() : "";
-  const matchDigit = Number(body.matchDigit);
-  const evenOdd = typeof body.evenOdd === "string" ? body.evenOdd.toUpperCase() : "";
-  const generatedAt = Number(body.generatedAt);
-  const sourceId = typeof body.sourceId === "string" ? body.sourceId.slice(0, 128) : "";
+  // Accept DigitEdge's common field names without requiring it to reshape its prediction.
+  const rawSymbol = body.symbol ?? body.market ?? body.underlying_symbol ?? body.volatilityIndex;
+  const symbol = typeof rawSymbol === "string" ? rawSymbol.trim() : "";
+  const rawDigit = body.matchDigit ?? body.predictionDigit ?? body.digit ?? body.prediction;
+  const matchDigit = Number(rawDigit);
+  const rawEvenOdd = body.evenOdd ?? body.parity;
   const now = Date.now();
+  const rawGeneratedAt = body.generatedAt ?? body.sourceGeneratedAt ?? body.createdAt ?? body.timestamp;
+  let generatedAt = typeof rawGeneratedAt === "string" && !Number.isFinite(Number(rawGeneratedAt))
+    ? Date.parse(rawGeneratedAt) : Number(rawGeneratedAt);
+  // Accept Unix seconds as well as JavaScript milliseconds.
+  if (Number.isFinite(generatedAt) && generatedAt > 0 && generatedAt < 1e12) generatedAt *= 1000;
+  const evenOdd = typeof rawEvenOdd === "string" && rawEvenOdd.trim()
+    ? rawEvenOdd.toUpperCase()
+    : (Number.isInteger(matchDigit) ? (matchDigit % 2 === 0 ? "EVEN" : "ODD") : "");
+  const rawSourceId = body.sourceId ?? body.signalId ?? body.id;
+  const sourceId = typeof rawSourceId === "string" || typeof rawSourceId === "number"
+    ? String(rawSourceId).slice(0, 128) : "";
 
   if (!symbols.includes(symbol))
     return res.status(400).json({ ok: false, reason: "INVALID_SYMBOL", allowedSymbols: symbols });
   if (!Number.isInteger(matchDigit) || matchDigit < 0 || matchDigit > 9)
     return res.status(400).json({ ok: false, reason: "INVALID_MATCH_DIGIT" });
-  if (!["EVEN", "ODD"].includes(evenOdd))
+  if (demoContractMode === "EVEN_ODD" && !["EVEN", "ODD"].includes(evenOdd))
     return res.status(400).json({ ok: false, reason: "INVALID_EVEN_ODD" });
   if (!Number.isFinite(generatedAt) || generatedAt > now + 1000 || now - generatedAt > 10000)
     return res.status(409).json({ ok: false, reason: "STALE_OR_INVALID_TIMESTAMP", maxAgeMs: 10000 });
