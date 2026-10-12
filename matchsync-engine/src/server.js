@@ -167,13 +167,20 @@ app.post("/api/ingest-signal", async (req, res) => {
   // Accept Unix seconds as well as JavaScript milliseconds.
   if (Number.isFinite(generatedAt) && generatedAt > 0 && generatedAt < 1e12) generatedAt *= 1000;
   const normalizedEvenOdd = typeof rawEvenOdd === "string" ? rawEvenOdd.trim().toUpperCase() : "";
-  // For MATCH_DIGIT, parity metadata must always match the exact predicted digit.
-  const evenOdd = demoContractMode === "MATCH_DIGIT"
-    ? (Number.isInteger(matchDigit) ? (matchDigit % 2 === 0 ? "EVEN" : "ODD") : "")
-    : (normalizedEvenOdd || (Number.isInteger(matchDigit) ? (matchDigit % 2 === 0 ? "EVEN" : "ODD") : ""));
+  // A supplied prediction digit is the single source of truth for parity in
+  // both MATCH_DIGIT and EVEN_ODD modes. Use provided parity only if no digit exists.
+  const evenOdd = Number.isInteger(matchDigit)
+    ? (matchDigit % 2 === 0 ? "EVEN" : "ODD")
+    : normalizedEvenOdd;
   const rawSourceId = body.sourceId ?? body.signalId ?? body.id;
-  const sourceId = typeof rawSourceId === "string" || typeof rawSourceId === "number"
-    ? String(rawSourceId).slice(0, 128) : "";
+  // DigitEdge versions that do not send an explicit ID remain compatible.
+  // Derive a stable id from the prediction payload so retries are deduplicated.
+  const sourceId = (typeof rawSourceId === "string" || typeof rawSourceId === "number")
+    ? String(rawSourceId).slice(0, 128)
+    : (Number.isFinite(generatedAt) && symbol && Number.isInteger(matchDigit)
+      ? "derived-" + crypto.createHash("sha256")
+        .update([symbol, matchDigit, generatedAt, evenOdd].join("|")).digest("hex").slice(0, 48)
+      : "");
 
   if (!symbols.includes(symbol))
     return res.status(400).json({ ok: false, reason: "INVALID_SYMBOL", allowedSymbols: symbols });
