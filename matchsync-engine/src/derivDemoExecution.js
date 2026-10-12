@@ -243,11 +243,12 @@ class DerivDemoExecutor {
     }
 
     let buyMsg;
+    const passthrough = { source: "MatchSyncEngine", signal_id: signal.id || "", mode: "DEMO_ONLY" };
     try {
       buyMsg = await this.request({
         buy: proposalMsg.proposal.id,
         price: askPrice,
-        passthrough: { source: "MatchSyncEngine", signal_id: signal.id || "", mode: "DEMO_ONLY" }
+        passthrough
       }, 2500);
     } catch (error) {
       console.error("[DerivDemoExecutor] Buy request failed", JSON.stringify({
@@ -256,8 +257,39 @@ class DerivDemoExecutor {
         errorCode: error.code || null, error: error.message, details: error.details || null,
         echoReq: error.derivEchoReq || null
       }));
-      error.message = "Buy request failed: " + error.message;
-      throw error;
+      // Deriv's current WebSocket API also supports buying directly with
+      // contract parameters. If a proposal ID is explicitly rejected as
+      // unknown, retry once using that documented form; an explicit
+      // InvalidContractProposal response means no contract was purchased.
+      if (error.code === "InvalidContractProposal" || /unknown contract proposal/i.test(error.message || "")) {
+        const parameters = {
+          amount: stake,
+          basis: "stake",
+          contract_type: contractType,
+          currency: this.currency,
+          duration: this.durationTicks,
+          duration_unit: "t",
+          underlying_symbol: signal.symbol
+        };
+        if (contractType === "DIGITMATCH") parameters.barrier = String(signal.matchDigit);
+        console.warn("[DerivDemoExecutor] Retrying once with direct demo contract parameters", JSON.stringify({
+          symbol: signal.symbol, contractType, duration: this.durationTicks, stake
+        }));
+        try {
+          buyMsg = await this.request({ buy: 1, price: askPrice, parameters, passthrough }, 2500);
+        } catch (retryError) {
+          console.error("[DerivDemoExecutor] Direct-parameter buy failed", JSON.stringify({
+            stage: "direct_buy", symbol: signal.symbol, contractType,
+            errorCode: retryError.code || null, error: retryError.message,
+            details: retryError.details || null, echoReq: retryError.derivEchoReq || null
+          }));
+          retryError.message = "Direct-parameter buy failed: " + retryError.message;
+          throw retryError;
+        }
+      } else {
+        error.message = "Buy request failed: " + error.message;
+        throw error;
+      }
     }
     if (!buyMsg.buy || !buyMsg.buy.contract_id)
       throw new Error("Deriv did not confirm a purchased contract");
