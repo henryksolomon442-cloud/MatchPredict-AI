@@ -38,6 +38,9 @@ let lastDemoExecution = demoTradingEnabled && process.env.DERIV_DEMO_TOKEN && ap
   ? { status: "connecting", message: "Checking the Deriv demo account; waiting for authenticated connection." }
   : { status: "disabled", reason: "DEMO_CONFIGURATION_INCOMPLETE", message: "Demo execution requires DEMO_TRADING_ENABLED=true, DERIV_DEMO_TOKEN, and DERIV_APP_ID." };
 let demoConnectInProgress = false;
+let syncRequestCount = 0;
+let lastSyncRequestAt = null;
+let lastSyncHttpStatus = null;
 async function connectDemoExecutor() {
   if (!demoExecutor || demoExecutor.ready || demoConnectInProgress) return;
   demoConnectInProgress = true;
@@ -130,7 +133,7 @@ app.get("/api/status", (_req, res) => {
     demoExecution: { enabled: demoTradingEnabled, autoExecute: demoAutoExecute, executorStatus: demoExecutor ? demoExecutor.status : "missing_demo_token_or_disabled", contractMode: demoContractMode, maxStake: demoMaxStake, cooldownMs: demoCooldownMs, dailyRisk: { ...demoDaily, maxTrades: demoMaxTradesPerDay, maxStakeTotal: demoMaxDailyStake }, lastResult: lastDemoExecution },
     uptimeSeconds: Math.floor((now - startedAt) / 1000),
     feedStatus: { ...feedStatus, liveTickSeen, lastTickAgeMs: ageMs, staleAfterMs }, signalCount,
-    digitEdgeSync: { enabled: Boolean(syncApiKey), endpoint: "/api/ingest-signal", mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY" },
+    digitEdgeSync: { enabled: Boolean(syncApiKey), endpoint: "/api/ingest-signal", mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY", requests: syncRequestCount, lastRequestAt: lastSyncRequestAt, lastHttpStatus: lastSyncHttpStatus },
     latestSignal: isFresh(latestSignal) && signalMarketFresh ? latestSignal : null,
     rankedMarkets: getRankedMarkets(),
     settings: { windowSize, minSamples, ttlMs, minConfidence, staleAfterMs, symbols }
@@ -144,6 +147,16 @@ app.get("/api/signal", (_req, res) => {
   res.set("Cache-Control", "no-store");
   res.json({ ok: true, signal: latestSignal, execution: "MARKET_SCANNER_ONLY_NO_EXECUTION" });
 });
+app.use("/api/ingest-signal", (req, res, next) => {
+  const requestStartedAt = Date.now();
+  res.on("finish", () => {
+    syncRequestCount++;
+    lastSyncRequestAt = new Date().toISOString();
+    lastSyncHttpStatus = res.statusCode;
+    console.log("[DigitEdgeSync] HTTP request", JSON.stringify({ method: req.method, status: res.statusCode, elapsedMs: Date.now() - requestStartedAt }));
+  });
+  next();
+});
 app.post("/api/ingest-signal", async (req, res) => {
   // Server-side key required. This endpoint never places trades.
   if (!syncApiKey) return res.status(503).json({ ok: false, reason: "SYNC_DISABLED", message: "Configure SYNC_API_KEY on the server first." });
@@ -154,7 +167,14 @@ app.post("/api/ingest-signal", async (req, res) => {
     return res.status(401).json({ ok: false, reason: "UNAUTHORIZED" });
 
   const body = req.body || {};
-  // Accept DigitEdge's common field names without requiring it to reshape its prediction.
+  console.log("[DigitEdgeSync] Authenticated payload fields", JSON.stringify({
+    fields: Object.keys(body).slice(0, 24),
+    symbolPresent: ["symbol", "market", "underlying_symbol", "volatilityIndex"].some(k => body[k] !== undefined),
+    digitPresent: ["matchDigit", "predictionDigit", "digit", "prediction"].some(k => body[k] !== undefined),
+    timestampPresent: ["generatedAt", "sourceGeneratedAt", "createdAt", "timestamp"].some(k => body[k] !== undefined),
+    sourceIdPresent: ["sourceId", "signalId", "id"].some(k => body[k] !== undefined)
+  }));
+  // Accept DigitEdge prediction payloads without requiring it to reshape its signal.
   const rawSymbol = body.symbol ?? body.market ?? body.underlying_symbol ?? body.volatilityIndex;
   const symbol = typeof rawSymbol === "string" ? rawSymbol.trim() : "";
   const rawDigit = body.matchDigit ?? body.predictionDigit ?? body.digit ?? body.prediction;
@@ -213,6 +233,7 @@ app.post("/api/ingest-signal", async (req, res) => {
     if (receivedSourceIds.size > 1000) receivedSourceIds.delete(receivedSourceIds.values().next().value);
   }
   signalCount++;
+  console.log("[DigitEdgeSync] Signal accepted", JSON.stringify({ symbol, matchDigit, ageMs: now - generatedAt, mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY" }));
   if (demoAutoExecute && demoTradingEnabled) {
     const utcDate = new Date().toISOString().slice(0, 10);
     if (demoDaily.date !== utcDate) { demoDaily.date = utcDate; demoDaily.trades = 0; demoDaily.stake = 0; }
@@ -243,6 +264,7 @@ app.post("/api/ingest-signal", async (req, res) => {
       }
     }
   }
+  console.log("[DigitEdgeSync] Execution outcome", JSON.stringify({ status: lastDemoExecution && lastDemoExecution.status, reason: lastDemoExecution && lastDemoExecution.reason, contractId: lastDemoExecution && lastDemoExecution.contractId, executionMs: lastDemoExecution && lastDemoExecution.executionMs, endToEndMs: lastDemoExecution && lastDemoExecution.endToEndMs }));
   res.set("Cache-Control", "no-store");
   return res.status(202).json({ ok: true, accepted: true, signal: latestSignal,
     execution: lastDemoExecution, mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY" });
