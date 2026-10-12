@@ -34,13 +34,20 @@ const receivedSourceIds = new Set();
 const demoHistory = [];
 let lastDemoExecutionAt = 0;
 let demoExecutor = null;
-let lastDemoExecution = { status: "disabled", message: "Demo execution is not configured." };
+let lastDemoExecution = demoTradingEnabled && process.env.DERIV_DEMO_TOKEN && appId
+  ? { status: "connecting", message: "Checking the Deriv demo account; waiting for authenticated connection." }
+  : { status: "disabled", reason: "DEMO_CONFIGURATION_INCOMPLETE", message: "Demo execution requires DEMO_TRADING_ENABLED=true, DERIV_DEMO_TOKEN, and DERIV_APP_ID." };
 let demoConnectInProgress = false;
 async function connectDemoExecutor() {
   if (!demoExecutor || demoExecutor.ready || demoConnectInProgress) return;
   demoConnectInProgress = true;
   try {
     await demoExecutor.connect();
+    lastDemoExecution = {
+      status: "ready",
+      message: "Deriv demo executor is connected; waiting for a fresh DigitEdge signal.",
+      executorStatus: demoExecutor.status
+    };
     console.log("Deriv demo executor connected and ready.");
   } catch (error) {
     lastDemoExecution = {
@@ -98,8 +105,11 @@ function handleTick(tick) {
   if (market.ticks.length > windowSize) market.ticks.splice(0, market.ticks.length - windowSize);
   const best = getRankedMarkets().find(m => m.ready && m.dataFresh);
   if (!best) return;
-  const same = isFresh(latestSignal) && latestSignal.symbol === best.symbol &&
-    latestSignal.matchDigit === best.topDigit && latestSignal.evenOdd === best.recentParity;
+  const bestParity = Number.isInteger(best.topDigit)
+    ? (best.topDigit % 2 === 0 ? "EVEN" : "ODD") : null;
+  const same = isFresh(latestSignal) && latestSignal.source === "MARKET_SCANNER" &&
+    latestSignal.symbol === best.symbol && latestSignal.matchDigit === best.topDigit &&
+    latestSignal.evenOdd === bestParity;
   if (!same && best.confidence >= minConfidence) {
     latestSignal = makeSignal(best.symbol, best, ttlMs);
     signalCount++;
@@ -154,9 +164,11 @@ app.post("/api/ingest-signal", async (req, res) => {
     ? Date.parse(rawGeneratedAt) : Number(rawGeneratedAt);
   // Accept Unix seconds as well as JavaScript milliseconds.
   if (Number.isFinite(generatedAt) && generatedAt > 0 && generatedAt < 1e12) generatedAt *= 1000;
-  const evenOdd = typeof rawEvenOdd === "string" && rawEvenOdd.trim()
-    ? rawEvenOdd.toUpperCase()
-    : (Number.isInteger(matchDigit) ? (matchDigit % 2 === 0 ? "EVEN" : "ODD") : "");
+  const normalizedEvenOdd = typeof rawEvenOdd === "string" ? rawEvenOdd.trim().toUpperCase() : "";
+  // For MATCH_DIGIT, parity metadata must always match the exact predicted digit.
+  const evenOdd = demoContractMode === "MATCH_DIGIT"
+    ? (Number.isInteger(matchDigit) ? (matchDigit % 2 === 0 ? "EVEN" : "ODD") : "")
+    : (normalizedEvenOdd || (Number.isInteger(matchDigit) ? (matchDigit % 2 === 0 ? "EVEN" : "ODD") : ""));
   const rawSourceId = body.sourceId ?? body.signalId ?? body.id;
   const sourceId = typeof rawSourceId === "string" || typeof rawSourceId === "number"
     ? String(rawSourceId).slice(0, 128) : "";
