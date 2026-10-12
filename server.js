@@ -150,6 +150,7 @@ app.get("/api/auth/status",async(req,res)=>{
 });
 
 app.post("/api/sync/digitedge",async(req,res)=>{
+  const syncStartedAt=Date.now();
   try{
     // Only an authenticated DigitEdge session may forward a prediction.
     const auth=req.session?.deriv;
@@ -162,6 +163,14 @@ app.post("/api/sync/digitedge",async(req,res)=>{
     const key=String(process.env.MATCHSYNC_SYNC_KEY||"");
     if(!target || !key)return res.status(503).json({ok:false,reason:"MATCHSYNC_NOT_CONFIGURED"});
     const b=req.body||{};
+    console.log("[DigitEdgeSync] Forward request",JSON.stringify({
+      authenticated:true,
+      fields:Object.keys(b).slice(0,16),
+      symbolPresent:Boolean(b.symbol),
+      digitPresent:b.matchDigit!==undefined,
+      timestampPresent:b.generatedAt!==undefined,
+      sourceIdPresent:Boolean(b.sourceId)
+    }));
     const symbol=String(b.symbol||"").trim();
     const matchDigit=Number(b.matchDigit);
     const evenOdd=String(b.evenOdd||"").toUpperCase();
@@ -179,9 +188,17 @@ app.post("/api/sync/digitedge",async(req,res)=>{
       body:JSON.stringify({symbol,matchDigit,evenOdd,generatedAt,sourceId,signalLevel:Number.isFinite(Number(b.signalLevel))?Number(b.signalLevel):null})
     });
     const result=await upstream.json().catch(()=>({ok:false,reason:"INVALID_UPSTREAM_RESPONSE"}));
+    console.log("[DigitEdgeSync] MatchSync response",JSON.stringify({
+      status:upstream.status,
+      accepted:Boolean(result.accepted),
+      executionStatus:result.execution?.status||null,
+      executionOk:result.execution?.ok===true,
+      reason:result.reason||result.execution?.reason||null,
+      elapsedMs:Date.now()-syncStartedAt
+    }));
     return res.status(upstream.status).json(result);
   }catch(e){
-    console.error("DigitEdge signal forwarding failed:",e.message);
+    console.error("[DigitEdgeSync] Signal forwarding failed:",e.message,"elapsedMs:",Date.now()-syncStartedAt);
     return res.status(502).json({ok:false,reason:"MATCHSYNC_FORWARD_FAILED"});
   }
 });
