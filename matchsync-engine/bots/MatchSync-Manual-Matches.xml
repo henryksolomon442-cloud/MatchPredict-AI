@@ -1,52 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xml xmlns="http://www.w3.org/1999/xhtml" collection="false">
   <variables>
-    <variable type="" id="matchsync_digit_var">MatchSync Prediction Digit</variable>
+    <variable type="" id="matchsync_prediction">DigitEdge Prediction Digit</variable>
   </variables>
-  <block type="trade" id="matchsync_trade_root" x="20" y="20">
-    <field name="MARKET_LIST">volidx</field>
-    <field name="SUBMARKET_LIST">random_index</field>
-    <field name="SYMBOL_LIST">R_100</field>
-    <field name="TRADETYPECAT_LIST">digits</field>
-    <field name="TRADETYPE_LIST">matchesdiffers</field>
-    <field name="TYPE_LIST">DIGITMATCH</field>
-    <field name="CANDLEINTERVAL_LIST">60</field>
-    <field name="TIME_MACHINE_ENABLED">FALSE</field>
-    <field name="RESTARTONERROR">FALSE</field>
-    <statement name="INITIALIZATION">
-      <block type="variables_set" id="matchsync_set_digit">
-        <field name="VAR" id="matchsync_digit_var" variabletype="">MatchSync Prediction Digit</field>
+  <block type="trade" id="matchsync_trade" x="20" y="20">
+    <statement name="SUBMARKET">
+      <block type="variables_set" id="matchsync_set_prediction">
+        <field name="VAR" id="matchsync_prediction" variabletype="">DigitEdge Prediction Digit</field>
         <value name="VALUE">
-          <block type="text_prompt_ext" id="matchsync_prompt_digit">
-            <mutation type="NUMBER"></mutation>
-            <field name="TYPE">NUMBER</field>
-            <value name="TEXT">
-              <shadow type="text" id="matchsync_prompt_label">
-                <field name="TEXT">Enter DigitEdge's confirmed digit (0-9)</field>
-              </shadow>
+          <block type="math_number" id="matchsync_initial_digit">
+            <field name="NUM">7</field>
+          </block>
+        </value>
+        <next>
+          <block type="market" id="matchsync_market">
+            <field name="MARKET_LIST">volidx</field>
+            <field name="SUBMARKET_LIST">random_index</field>
+            <field name="SYMBOL_LIST">R_100</field>
+            <field name="TRADETYPECAT_LIST">digits</field>
+            <field name="TRADETYPE_LIST">matchesdiffers</field>
+            <field name="TYPE_LIST">DIGITMATCH</field>
+            <field name="CANDLEINTERVAL_LIST">60</field>
+            <field name="DURATIONTYPE_LIST">t</field>
+            <field name="PAYOUTTYPE_LIST">stake</field>
+            <field name="CURRENCY_LIST">USD</field>
+            <field name="RESTARTONERROR">FALSE</field>
+            <value name="DURATION">
+              <block type="math_number" id="matchsync_duration">
+                <field name="NUM">1</field>
+              </block>
+            </value>
+            <value name="AMOUNT">
+              <block type="math_number" id="matchsync_stake">
+                <field name="NUM">1</field>
+              </block>
+            </value>
+            <value name="PREDICTION">
+              <block type="variables_get" id="matchsync_prediction_get">
+                <field name="VAR" id="matchsync_prediction" variabletype="">DigitEdge Prediction Digit</field>
+              </block>
             </value>
           </block>
-        </value>
+        </next>
       </block>
     </statement>
-    <statement name="SUBMARKET">
-      <block type="tradeOptions" id="matchsync_trade_options">
-        <field name="DURATIONTYPE_LIST">t</field>
-        <field name="CURRENCY_LIST">USD</field>
-        <value name="DURATION">
-          <shadow type="math_number" id="matchsync_duration">
-            <field name="NUM">1</field>
+  </block>
+  <block type="before_purchase" id="matchsync_before_purchase" x="20" y="420">
+    <statement name="BEFOREPURCHASE_STACK">
+      <block type="purchase" id="matchsync_purchase">
+        <field name="PURCHASE_LIST">DIGITMATCH</field>
+      </block>
+    </statement>
+  </block>
+  <block type="after_purchase" id="matchsync_after_purchase" x="20" y="540">
+    <statement name="AFTERPURCHASE_STACK">
+      <block type="notify" id="matchsync_result_notice">
+        <field name="NOTIFICATION_TYPE">info</field>
+        <field name="NOTIFICATION_SOUND">silent</field>
+        <value name="MESSAGE">
+          <shadow type="text" id="matchsync_result_message">
+            <field name="TEXT">Trade completed. Check the Deriv result before running again.</field>
           </shadow>
-        </value>
-        <value name="AMOUNT">
-          <shadow type="math_number" id="matchsync_stake">
-            <field name="NUM">1</field>
-          </shadow>
-        </value>
-        <value name="PREDICTION">
-          <block type="variables_get" id="matchsync_get_digit">
-            <field name="VAR" id="matchsync_digit_var" variabletype="">MatchSync Prediction Digit</field>
-          </block>
         </value>
       </block>
     </statement>
