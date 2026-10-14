@@ -719,7 +719,9 @@ async function syncLockedDigitEdgeSignal(s,candidate,level){
     evenOdd:candidate%2===0?"EVEN":"ODD",
     generatedAt:s.liveSignal.generatedAt,
     sourceId:s.liveSignal.sourceId,
-    signalLevel:level
+    signalLevel:level,
+    agreement:Number.isInteger(s.analysis?.agreement)?s.analysis.agreement:null,
+    signalReason:typeof s.liveSignal.reason==="string"?s.liveSignal.reason:""
   };
   try{
     const response=await fetch("/api/sync/digitedge",{
@@ -776,7 +778,7 @@ function finishLiveScanWithoutSignal(s){
     ? Math.max(scan.bestLevel||0,signalLevelForMarket(s,candidate,livePreds))
     : 0;
 
-  // Never forward a fallback or a percentage score: only a 4/4 consensus qualifies.
+  // Never forward a fallback: only 4/4 or qualified 3/4 (level >= 90) consensus qualifies.
   s.liveSignal={
     pred:Number.isInteger(candidate)?candidate:null,
     level,
@@ -970,7 +972,7 @@ function renderLiveSignalPanel(s){
         <div class="live-signal-label">No live scan yet</div>
         <div class="live-signal-level">READY</div>
         <div class="live-signal-sub">
-          Press ANALYZE. DigitEdge scans for at least 15 seconds and at most 30 seconds. After 15 seconds, it sends only when all 4 models agree on the same digit (4/4). If no 4/4 appears by 30 seconds, no signal is sent.
+          Press ANALYZE. DigitEdge scans for at least 10 seconds and at most 30 seconds. It sends immediately when all 4 models agree (4/4), or when 3/4 agree and the model qualification level is at least 90. If neither condition is met by 30 seconds, no signal is sent.
         </div>
         <div class="live-level-track"><div class="live-level-fill" style="width:0%"></div></div>
       </div>
