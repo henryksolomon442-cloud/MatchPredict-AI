@@ -809,7 +809,7 @@ window.analyzeLiveMarket=function(symbol){
   s.liveScan={
     scanId,
     duration:30,
-    minDurationMs:10000,
+    minDurationMs:0,
     preds:[],
     started:Date.now(),
     bestLevel:0,
@@ -891,7 +891,7 @@ function renderLiveSignalPanel(s){
           <div class="live-signal-label">Watching changing candidates · waiting for best rate</div>
           <div class="live-signal-level">${remaining}s LEFT</div>
           <div class="live-signal-sub">
-            ${Number.isInteger(s.liveScan.bestCandidate)?`Current best candidate: MATCH ${s.liveScan.bestCandidate}`:"Evaluating digits…"} · best level so far: ${best}% · locks only after 30 seconds if level reaches 90%
+            ${Number.isInteger(s.liveScan.bestCandidate)?`Current best candidate: MATCH ${s.liveScan.bestCandidate}`:"Evaluating digits…"} · best level so far: ${best}% · sends immediately when 4/4 agrees or 3/4 reaches level 90%
           </div>
           <div class="live-level-track">
             <div class="live-level-fill wait" style="width:${pct}%"></div>
@@ -972,7 +972,7 @@ function renderLiveSignalPanel(s){
         <div class="live-signal-label">No live scan yet</div>
         <div class="live-signal-level">READY</div>
         <div class="live-signal-sub">
-          Press ANALYZE. DigitEdge scans for at least 10 seconds and at most 30 seconds. It sends immediately when all 4 models agree (4/4), or when 3/4 agree and the model qualification level is at least 90. If neither condition is met by 30 seconds, no signal is sent.
+          Press ANALYZE. DigitEdge scans for at least 10 seconds and at most 30 seconds. It sends immediately on a live tick when all 4 models agree (4/4), or when 3/4 agree and the model qualification level is at least 90. The 30-second limit is only the maximum wait; there is no extra 10-second delay after qualification. If neither condition is met, no signal is sent.
         </div>
         <div class="live-level-track"><div class="live-level-fill" style="width:0%"></div></div>
       </div>
@@ -1214,19 +1214,18 @@ function handle(m){
               s.liveScan.bestCandidate=candidate;
             }
 
-            // Keep the 30-second scan window, but permit qualifying signals from 10 seconds onward.
-            // 4/4 agreement forwards immediately; 3/4 only qualifies when its model level is >= 90.
-            const elapsed=Date.now()-s.liveScan.started;
+            // A live tick that produces a qualifying model consensus is forwarded immediately.
+            // The 30-second timeout is only a maximum wait; it is not an intentional entry delay.
             const agreement=s.analysis?.agreement;
             const confirmedDigit=s.analysis?.pred;
-            if(elapsed>=s.liveScan.minDurationMs && Number.isInteger(confirmedDigit)){
+            if(Number.isInteger(confirmedDigit)){
               const confirmedLevel=signalLevelForMarket(s,confirmedDigit,s.liveScan.preds);
               const qualifiesFour=agreement===4;
               const qualifiesThree=agreement===3 && confirmedLevel>=90;
               if(qualifiesFour || qualifiesThree){
                 const reason=qualifiesFour
-                  ? "4_of_4_after_10s"
-                  : "3_of_4_level_90_after_10s";
+                  ? "4_of_4_immediate"
+                  : "3_of_4_level_90_immediate";
                 finishLiveScanWithLockedSignal(s,confirmedDigit,confirmedLevel,reason);
               }
             }
