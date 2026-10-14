@@ -185,7 +185,12 @@ app.post("/api/sync/digitedge",async(req,res)=>{
     const upstream=await fetch(target+"/api/ingest-signal",{
       method:"POST",
       headers:{"Content-Type":"application/json","x-sync-key":key},
-      body:JSON.stringify({symbol,matchDigit,evenOdd,generatedAt,sourceId,signalLevel:Number.isFinite(Number(b.signalLevel))?Number(b.signalLevel):null})
+      body:JSON.stringify({
+        symbol,matchDigit,evenOdd,generatedAt,sourceId,
+        signalLevel:Number.isFinite(Number(b.signalLevel))?Number(b.signalLevel):null,
+        agreement:Number.isInteger(Number(b.agreement))?Number(b.agreement):null,
+        signalReason:typeof b.signalReason==="string"?b.signalReason.slice(0,80):null
+      })
     });
     const result=await upstream.json().catch(()=>({ok:false,reason:"INVALID_UPSTREAM_RESPONSE"}));
     console.log("[DigitEdgeSync] MatchSync response",JSON.stringify({
