@@ -202,6 +202,20 @@ app.post("/api/ingest-signal", async (req, res) => {
         .update([symbol, matchDigit, generatedAt, evenOdd].join("|")).digest("hex").slice(0, 48)
       : "");
 
+  const agreement = Number(body.agreement ?? body.modelAgreement ?? body.agreementCount);
+  const signalLevel = Number(body.signalLevel);
+  const qualifiesFour = agreement === 4;
+  const qualifiesThree = agreement === 3 && Number.isFinite(signalLevel) && signalLevel >= 90;
+  if (!qualifiesFour && !qualifiesThree)
+    return res.status(422).json({
+      ok: false,
+      accepted: false,
+      reason: "UNQUALIFIED_SIGNAL",
+      message: "Only 4/4 agreement or 3/4 agreement with model level >= 90 may enter the execution pipeline.",
+      agreement: Number.isFinite(agreement) ? agreement : null,
+      signalLevel: Number.isFinite(signalLevel) ? signalLevel : null
+    });
+
   if (!symbols.includes(symbol))
     return res.status(400).json({ ok: false, reason: "INVALID_SYMBOL", allowedSymbols: symbols });
   if (!Number.isInteger(matchDigit) || matchDigit < 0 || matchDigit > 9)
@@ -224,7 +238,9 @@ app.post("/api/ingest-signal", async (req, res) => {
     id: crypto.randomUUID(), sourceId: sourceId || null, source: "DIGITEDGE_SYNC",
     symbol, volatility: symbol, matchDigit, evenOdd,
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
-    signalLevel: Number.isFinite(Number(body.signalLevel)) ? Math.max(0, Math.min(100, Number(body.signalLevel))) : null,
+    agreement,
+    signalLevel: Number.isFinite(signalLevel) ? Math.max(0, Math.min(100, signalLevel)) : null,
+    signalReason: typeof body.signalReason === "string" ? body.signalReason.slice(0, 80) : null,
     createdAt: now, receivedAt: now, sourceGeneratedAt: generatedAt,
     expiresAt: now + ttlMs, mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY"
   };
