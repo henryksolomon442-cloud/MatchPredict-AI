@@ -196,9 +196,9 @@ app.post("/api/sync/digitedge",async(req,res)=>{
     console.log("[DigitEdgeSync] MatchSync response",JSON.stringify({
       status:upstream.status,
       accepted:Boolean(result.accepted),
-      executionStatus:result.execution?.status||null,
-      executionOk:result.execution?.ok===true,
-      reason:result.reason||result.execution?.reason||null,
+      executionStatus:{demo:result.execution?.demo?.status||null,real:result.execution?.real?.status||null},
+      executionOk:result.execution?.demo?.ok===true || result.execution?.real?.ok===true,
+      reason:result.reason||result.execution?.demo?.reason||result.execution?.real?.reason||null,
       elapsedMs:Date.now()-syncStartedAt
     }));
     return res.status(upstream.status).json(result);
