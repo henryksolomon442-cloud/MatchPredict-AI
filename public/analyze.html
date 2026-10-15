@@ -992,17 +992,17 @@ function renderMarketMatrix(){
 
   grid.innerHTML=states.map(s=>{
     const a=s.analysis;
-    const status=s.error?`Error: ${s.error}`:s.loading?"Loading history…":a?`Independent model: ${a.preds.join(", ")}`:"Collecting ticks…";
+    const status=s.error?`Error: ${s.error}`:s.loading?"Loading history…":s.liveScan?"Live scan running; no digit locked.":s.liveSignal&&!s.liveSignal.qualified?"WAIT: no qualified digit.":s.liveSignal?.locked?`Locked live signal: MATCH ${s.liveSignal.pred}.`:"Research only — run live scan for a qualified signal.";
     const score=a?.ranked?.find(x=>x.d===a.pred)?.score;
+    const finalDigit=s.liveSignal?.locked&&s.liveSignal?.qualified&&Number.isInteger(s.liveSignal.pred)?s.liveSignal.pred:null;
     return `<div class="market-card ${s.symbol===focusedSymbol?"focused":""}" data-symbol="${s.symbol}">
       <div class="market-head">
         <div><div class="market-name">${s.name}</div><div class="market-code">${s.symbol}</div></div>
         ${s.symbol===focusedSymbol?'<span class="focus-label">FOCUSED</span>':(a?.agreement===4?'<span class="tag">4/4 STRONG</span>':'<span class="tag">INDEPENDENT</span>')}
       </div>
-      <div class="market-match">${Number.isInteger(s.prediction)?s.prediction:"—"}</div>
+      <div class="market-match">${Number.isInteger(finalDigit)?finalDigit:(s.liveScan?"…":"—")}</div>
       <div style="font-weight:900">
-        ${Number.isInteger(s.prediction)?`MATCH ${s.prediction}`:"WAITING"}
-        ${Number.isFinite(score)?` · DIGIT SCORE ${(score*100).toFixed(1)}%`:""}
+        ${Number.isInteger(finalDigit)?`QUALIFIED MATCH ${finalDigit}`:(s.liveScan?"ANALYZING":"WAIT — NO QUALIFIED DIGIT")}
       </div>
       <div class="market-meta">
         <div><span>Agreement</span><b>${a?`${a.agreement}/4`:"—"}</b></div>
