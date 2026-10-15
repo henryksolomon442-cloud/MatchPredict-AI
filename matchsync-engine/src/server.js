@@ -321,7 +321,7 @@ app.post("/api/ingest-signal", async (req, res) => {
   console.log("[DigitEdgeSync] Execution outcome", JSON.stringify({ demo: { status: lastDemoExecution && lastDemoExecution.status, reason: lastDemoExecution && lastDemoExecution.reason, contractId: lastDemoExecution && lastDemoExecution.contractId }, real: { status: lastRealExecution && lastRealExecution.status, reason: lastRealExecution && lastRealExecution.reason, contractId: lastRealExecution && lastRealExecution.contractId } }));
   res.set("Cache-Control", "no-store");
   return res.status(202).json({ ok: true, accepted: true, signal: latestSignal,
-    execution: lastDemoExecution, mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY" });
+    execution: { demo: lastDemoExecution, real: lastRealExecution }, mode: (demoTradingEnabled ? "DEMO" : "PAPER") + (realTradingEnabled ? "+REAL" : "") });
 });
 app.get("/api/demo-history", (_req, res) => res.json({ mode: "DEMO", history: demoHistory }));
 app.get("/api/real-status", (_req, res) => res.json({ mode: "REAL", enabled: realTradingEnabled, autoExecute: realAutoExecute, executorStatus: realExecutor ? realExecutor.status : "missing_real_token_or_disabled", lastResult: lastRealExecution, dailyRisk: { ...realDaily, maxTrades: realMaxTradesPerDay, maxStakeTotal: realMaxDailyStake } }));
