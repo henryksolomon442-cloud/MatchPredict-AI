@@ -167,6 +167,59 @@ class DerivDemoExecutor {
     });
   }
 
+  async watchSettlement(contractId, result) {
+    // Poll the purchased demo contract until Deriv reports its final settlement.
+    // This records the actual outcome; ORDER_CONFIRMED alone is not a win.
+    const startedAt = Date.now();
+    const maxWaitMs = 30000;
+    while (Date.now() - startedAt < maxWaitMs) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      if (!this.ready || !this.isVirtual) {
+        result.settlement = { status: "unavailable", reason: "DEMO_CONNECTION_LOST", checkedAt: Date.now() };
+        console.warn("[DerivDemoExecutor] Settlement tracking unavailable", JSON.stringify({ contractId, reason: "DEMO_CONNECTION_LOST" }));
+        return;
+      }
+      try {
+        const msg = await this.request({ proposal_open_contract: 1, contract_id: contractId }, 2500);
+        const contract = msg.proposal_open_contract;
+        if (!contract) continue;
+        const sold = contract.is_sold === 1 || contract.is_sold === true;
+        const status = String(contract.status || "").toLowerCase();
+        if (sold || status === "won" || status === "lost" || status === "sold") {
+          const profit = Number(contract.profit);
+          result.settlement = {
+            status: status || (profit > 0 ? "won" : profit < 0 ? "lost" : "sold"),
+            isSold: sold,
+            profit: Number.isFinite(profit) ? profit : null,
+            buyPrice: Number.isFinite(Number(contract.buy_price)) ? Number(contract.buy_price) : result.stake,
+            payout: Number.isFinite(Number(contract.sell_price)) ? Number(contract.sell_price) : null,
+            entryTick: contract.entry_tick ?? null,
+            exitTick: contract.exit_tick ?? null,
+            entryTickDisplayValue: contract.entry_tick_display_value ?? null,
+            exitTickDisplayValue: contract.exit_tick_display_value ?? null,
+            settledAt: Date.now(),
+            durationMs: Date.now() - startedAt
+          };
+          console.log("[DerivDemoExecutor] Demo contract settled", JSON.stringify({
+            contractId, symbol: result.symbol, matchDigit: result.matchDigit,
+            status: result.settlement.status, profit: result.settlement.profit,
+            entryTick: result.settlement.entryTickDisplayValue,
+            exitTick: result.settlement.exitTickDisplayValue,
+            durationMs: result.settlement.durationMs
+          }));
+          return;
+        }
+      } catch (error) {
+        // Transient polling failures should not cancel the already purchased contract.
+        console.warn("[DerivDemoExecutor] Settlement poll failed", JSON.stringify({
+          contractId, error: error.message
+        }));
+      }
+    }
+    result.settlement = { status: "timeout", reason: "SETTLEMENT_NOT_CONFIRMED_WITHIN_30S", checkedAt: Date.now() };
+    console.warn("[DerivDemoExecutor] Settlement tracking timed out", JSON.stringify({ contractId }));
+  }
+
   async execute(signal, requestedStake) {
     if (!this.ready || !this.isVirtual)
       return { ok: false, reason: "DEMO_EXECUTOR_NOT_READY", status: this.status };
@@ -294,7 +347,7 @@ class DerivDemoExecutor {
     if (!buyMsg.buy || !buyMsg.buy.contract_id)
       throw new Error("Deriv did not confirm a purchased contract");
 
-    return {
+    const result = {
       ok: true,
       mode: "DEMO_ONLY",
       status: "ORDER_CONFIRMED",
@@ -308,8 +361,17 @@ class DerivDemoExecutor {
       currency: this.currency,
       executionMs: Date.now() - startedAt,
       endToEndMs: Date.now() - sourceGeneratedAt,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      settlement: { status: "pending" }
     };
+    // Run in the background so signal acceptance and order placement stay fast.
+    this.watchSettlement(result.contractId, result).catch(error => {
+      result.settlement = { status: "error", reason: error.message, checkedAt: Date.now() };
+      console.error("[DerivDemoExecutor] Settlement watcher failed", JSON.stringify({
+        contractId: result.contractId, error: error.message
+      }));
+    });
+    return result;
   }
 
   close() {
