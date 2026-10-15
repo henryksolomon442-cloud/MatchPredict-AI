@@ -7,6 +7,7 @@ const { lastDigit, analyzeMarket } = require("./analyzer");
 const { makeSignal, isFresh } = require("./signal");
 const { PaperExecution } = require("./paperExecution");
 const { DerivDemoExecutor } = require("./derivDemoExecution");
+const { DerivAccountExecutor } = require("./derivAccountExecution");
 
 const app = express();
 app.use(express.json({ limit: "16kb" }));
@@ -19,13 +20,21 @@ const minSamples = Math.max(20, Number(process.env.MIN_SAMPLES || 40));
 const ttlMs = Math.max(1000, Number(process.env.SIGNAL_TTL_MS || 5000));
 const minConfidence = Number(process.env.MIN_CONFIDENCE || 0.55);
 const demoTradingEnabled = process.env.DEMO_TRADING_ENABLED === "true";
+const realTradingEnabled = process.env.REAL_TRADING_ENABLED === "true";
 const demoAutoExecute = process.env.DEMO_AUTO_EXECUTE === "true";
+const realAutoExecute = process.env.REAL_AUTO_EXECUTE === "true";
 const demoMaxStake = Math.min(0.35, Math.max(0.01, Number(process.env.DEMO_MAX_STAKE || 0.35)));
+const realMaxStake = Math.min(0.35, Math.max(0.01, Number(process.env.REAL_MAX_STAKE || 0.01)));
 const demoContractMode = process.env.DEMO_CONTRACT_MODE === "EVEN_ODD" ? "EVEN_ODD" : "MATCH_DIGIT";
+const realContractMode = process.env.REAL_CONTRACT_MODE === "EVEN_ODD" ? "EVEN_ODD" : "MATCH_DIGIT";
 const demoCooldownMs = Math.max(10000, Number(process.env.DEMO_COOLDOWN_MS || 10000));
+const realCooldownMs = Math.max(10000, Number(process.env.REAL_COOLDOWN_MS || 10000));
 const demoMaxTradesPerDay = Math.max(1, Math.floor(Number(process.env.DEMO_MAX_TRADES_PER_DAY || 20)));
+const realMaxTradesPerDay = Math.max(1, Math.floor(Number(process.env.REAL_MAX_TRADES_PER_DAY || 3)));
 const demoMaxDailyStake = Math.max(demoMaxStake, Number(process.env.DEMO_MAX_DAILY_STAKE || 7));
+const realMaxDailyStake = Math.max(realMaxStake, Number(process.env.REAL_MAX_DAILY_STAKE || 0.03));
 const demoDaily = { date: new Date().toISOString().slice(0, 10), trades: 0, stake: 0 };
+const realDaily = { date: new Date().toISOString().slice(0, 10), trades: 0, stake: 0 };
 const staleAfterMs = Math.max(3000, Number(process.env.STALE_AFTER_MS || 10000));
 const markets = Object.fromEntries(symbols.map(symbol => [symbol, { ticks: [], latestQuote: null, latestEpoch: null, lastTickAt: null, tickCount: 0 }]));
 let feedStatus = { connected: false, message: appId ? "Waiting for feed…" : "Set DERIV_APP_ID to connect." };
@@ -33,7 +42,11 @@ let latestSignal = null, signalCount = 0, startedAt = Date.now(), feed = null, l
 const receivedSourceIds = new Set();
 const demoHistory = [];
 let lastDemoExecutionAt = 0;
+let lastRealExecutionAt = 0;
 let demoExecutor = null;
+let realExecutor = null;
+let lastRealExecution = { status: "disabled", reason: "REAL_EXECUTION_OPT_IN_REQUIRED" };
+let realConnectInProgress = false;
 let lastDemoExecution = demoTradingEnabled && process.env.DERIV_DEMO_TOKEN && appId
   ? { status: "connecting", message: "Checking the Deriv demo account; waiting for authenticated connection." }
   : { status: "disabled", reason: "DEMO_CONFIGURATION_INCOMPLETE", message: "Demo execution requires DEMO_TRADING_ENABLED=true, DERIV_DEMO_TOKEN, and DERIV_APP_ID." };
@@ -75,6 +88,19 @@ if (demoTradingEnabled && process.env.DERIV_DEMO_TOKEN && appId) {
     if (demoExecutor && !demoExecutor.ready) connectDemoExecutor();
   }, 5000);
   if (typeof demoReconnectTimer.unref === "function") demoReconnectTimer.unref();
+}
+if (realTradingEnabled && process.env.DERIV_REAL_TOKEN && appId) {
+  realExecutor = new DerivAccountExecutor({ appId, token: process.env.DERIV_REAL_TOKEN, accountMode: "REAL", maxStake: realMaxStake, contractMode: realContractMode, durationTicks: Math.max(1, Number(process.env.REAL_DURATION_TICKS || 1)) });
+  async function connectRealExecutor() {
+    if (!realExecutor || realExecutor.ready || realConnectInProgress) return;
+    realConnectInProgress = true;
+    try { await realExecutor.connect(); lastRealExecution = { status: "ready", message: "Real account verified; waiting for a fresh signal.", executorStatus: realExecutor.status }; }
+    catch (error) { lastRealExecution = { status: "authorization_error", reason: error.message, executorStatus: realExecutor ? realExecutor.status : "missing_real_token" }; console.error("Deriv real account connection failed:", error.message); }
+    finally { realConnectInProgress = false; }
+  }
+  connectRealExecutor();
+  const realReconnectTimer = setInterval(() => { if (realExecutor && !realExecutor.ready) connectRealExecutor(); }, 5000);
+  if (typeof realReconnectTimer.unref === "function") realReconnectTimer.unref();
 }
 const paperExecution = new PaperExecution({
   maxStake: Number(process.env.PAPER_MAX_STAKE || 0.35),
@@ -128,9 +154,10 @@ app.get("/api/status", (_req, res) => {
   const signalMarketFresh = Boolean(signalMarket && signalMarket.lastTickAt !== null && now - signalMarket.lastTickAt <= staleAfterMs);
   res.set("Cache-Control", "no-store");
   res.json({
-    app: "MatchSync Engine", mode: demoTradingEnabled ? "DEMO_EXECUTION_CONFIGURED" : "PAPER_ONLY",
+    app: "MatchSync Engine", mode: (demoTradingEnabled ? "DEMO" : "PAPER") + (realTradingEnabled ? "+REAL_CONFIGURED" : ""),
     tradingEnabled: Boolean(demoTradingEnabled && demoAutoExecute && demoExecutor && demoExecutor.ready),
     demoExecution: { enabled: demoTradingEnabled, autoExecute: demoAutoExecute, executorStatus: demoExecutor ? demoExecutor.status : "missing_demo_token_or_disabled", contractMode: demoContractMode, maxStake: demoMaxStake, cooldownMs: demoCooldownMs, dailyRisk: { ...demoDaily, maxTrades: demoMaxTradesPerDay, maxStakeTotal: demoMaxDailyStake }, lastResult: lastDemoExecution },
+    realExecution: { enabled: realTradingEnabled, autoExecute: realAutoExecute, executorStatus: realExecutor ? realExecutor.status : "missing_real_token_or_disabled", contractMode: realContractMode, maxStake: realMaxStake, cooldownMs: realCooldownMs, dailyRisk: { ...realDaily, maxTrades: realMaxTradesPerDay, maxStakeTotal: realMaxDailyStake }, lastResult: lastRealExecution },
     uptimeSeconds: Math.floor((now - startedAt) / 1000),
     feedStatus: { ...feedStatus, liveTickSeen, lastTickAgeMs: ageMs, staleAfterMs }, signalCount,
     digitEdgeSync: { enabled: Boolean(syncApiKey), endpoint: "/api/ingest-signal", mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY", requests: syncRequestCount, lastRequestAt: lastSyncRequestAt, lastHttpStatus: lastSyncHttpStatus },
@@ -224,7 +251,7 @@ app.post("/api/ingest-signal", async (req, res) => {
     return res.status(400).json({ ok: false, reason: "INVALID_EVEN_ODD" });
   if (!Number.isFinite(generatedAt) || generatedAt > now + 1000 || now - generatedAt > 10000)
     return res.status(409).json({ ok: false, reason: "STALE_OR_INVALID_TIMESTAMP", maxAgeMs: 10000 });
-  if (demoAutoExecute && !sourceId)
+  if ((demoAutoExecute || realAutoExecute) && !sourceId)
     return res.status(400).json({ ok: false, reason: "SOURCE_ID_REQUIRED_FOR_AUTO_EXECUTION" });
   if (sourceId && receivedSourceIds.has(sourceId))
     return res.status(409).json({ ok: false, reason: "DUPLICATE_SOURCE_ID" });
@@ -280,12 +307,24 @@ app.post("/api/ingest-signal", async (req, res) => {
       }
     }
   }
-  console.log("[DigitEdgeSync] Execution outcome", JSON.stringify({ status: lastDemoExecution && lastDemoExecution.status, reason: lastDemoExecution && lastDemoExecution.reason, contractId: lastDemoExecution && lastDemoExecution.contractId, executionMs: lastDemoExecution && lastDemoExecution.executionMs, endToEndMs: lastDemoExecution && lastDemoExecution.endToEndMs }));
+  if (realAutoExecute && realTradingEnabled) {
+    const utcDate = new Date().toISOString().slice(0, 10);
+    if (realDaily.date !== utcDate) { realDaily.date = utcDate; realDaily.trades = 0; realDaily.stake = 0; }
+    const requestedStake = body.realStake !== undefined ? Number(body.realStake) : realMaxStake;
+    if (realDaily.trades >= realMaxTradesPerDay) lastRealExecution = { status: "blocked", reason: "DAILY_TRADE_LIMIT", maxTrades: realMaxTradesPerDay };
+    else if (!Number.isFinite(requestedStake) || requestedStake <= 0 || requestedStake > realMaxStake) lastRealExecution = { status: "blocked", reason: "INVALID_STAKE", maxStake: realMaxStake };
+    else if (realDaily.stake + requestedStake > realMaxDailyStake) lastRealExecution = { status: "blocked", reason: "DAILY_STAKE_LIMIT", remainingStake: Math.max(0, realMaxDailyStake - realDaily.stake) };
+    else if (!realExecutor || !realExecutor.ready || realExecutor.isVirtual) lastRealExecution = { status: "blocked", reason: "REAL_EXECUTOR_NOT_READY", executorStatus: realExecutor ? realExecutor.status : "missing_real_token" };
+    else if (now - lastRealExecutionAt < realCooldownMs) lastRealExecution = { status: "blocked", reason: "REAL_COOLDOWN", retryAfterMs: realCooldownMs - (now - lastRealExecutionAt) };
+    else { lastRealExecutionAt = now; try { const result = await realExecutor.execute(latestSignal, requestedStake); lastRealExecution = result; if (result.ok) { realDaily.trades++; realDaily.stake = Number((realDaily.stake + result.stake).toFixed(2)); } } catch (e) { lastRealExecution = { ok: false, status: "execution_error", reason: e.message }; } }
+  }
+  console.log("[DigitEdgeSync] Execution outcome", JSON.stringify({ demo: { status: lastDemoExecution && lastDemoExecution.status, reason: lastDemoExecution && lastDemoExecution.reason, contractId: lastDemoExecution && lastDemoExecution.contractId }, real: { status: lastRealExecution && lastRealExecution.status, reason: lastRealExecution && lastRealExecution.reason, contractId: lastRealExecution && lastRealExecution.contractId } }));
   res.set("Cache-Control", "no-store");
   return res.status(202).json({ ok: true, accepted: true, signal: latestSignal,
     execution: lastDemoExecution, mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY" });
 });
-app.get("/api/demo-history", (_req, res) => res.json({ mode: "DEMO_ONLY", history: demoHistory }));
+app.get("/api/demo-history", (_req, res) => res.json({ mode: "DEMO", history: demoHistory }));
+app.get("/api/real-status", (_req, res) => res.json({ mode: "REAL", enabled: realTradingEnabled, autoExecute: realAutoExecute, executorStatus: realExecutor ? realExecutor.status : "missing_real_token_or_disabled", lastResult: lastRealExecution, dailyRisk: { ...realDaily, maxTrades: realMaxTradesPerDay, maxStakeTotal: realMaxDailyStake } }));
 app.get("/api/health", (_req, res) => res.json({ ok: true, mode: demoTradingEnabled ? "DEMO_ONLY" : "PAPER_ONLY" }));
 app.post("/api/paper-execute", (req, res) => {
   const stake = req.body && req.body.stake !== undefined ? req.body.stake : 0.35;
@@ -305,6 +344,7 @@ app.post("/api/stop", (req, res) => {
     return res.status(401).json({ ok: false, reason: "UNAUTHORIZED" });
   if (feed) feed.close();
   if (demoExecutor) demoExecutor.close();
+  if (realExecutor) realExecutor.close();
   feedStatus = { connected: false, message: "Feed stopped by user." };
   res.json({ ok: true, message: "Public feed stopped. No trades were placed." });
 });
