@@ -1,5 +1,17 @@
-function lastDigit(quote) {
-  const digits = String(quote).replace(/\D/g, "");
+function formatQuote(quote, pipSize) {
+  const precision = Number(pipSize);
+  if (quote !== null && quote !== undefined &&
+      pipSize !== null && pipSize !== undefined &&
+      Number.isInteger(precision) && precision >= 0 && precision <= 10 &&
+      Number.isFinite(Number(quote))) {
+    return Number(quote).toFixed(precision);
+  }
+  return String(quote ?? "");
+}
+
+function lastDigit(quote, pipSize) {
+  const displayed = formatQuote(quote, pipSize);
+  const digits = displayed.replace(/\D/g, "");
   return digits.length ? Number(digits[digits.length - 1]) : null;
 }
 
@@ -35,4 +47,4 @@ function analyzeMarket(ticks, minSamples) {
     latestDigit: n ? digits[n - 1] : null
   };
 }
-module.exports = { lastDigit, analyzeMarket };
+module.exports = { lastDigit, formatQuote, analyzeMarket };
