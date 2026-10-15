@@ -48,7 +48,7 @@ class DerivAccountExecutor {
       const loginId = String(account.loginid || account.login_id || "").toUpperCase();
       const virtual = type === "demo" || type === "virtual" || account.is_virtual === 1 ||
         account.is_virtual === true || loginId.startsWith("VRTC");
-      return this.accountMode === "DEMO" ? virtual : (!virtual && (type === "real" || type === "trading" || loginId.startsWith("CR"));
+      return this.accountMode === "DEMO" ? virtual : (!virtual && (type === "real" || type === "trading" || loginId.startsWith("CR")));
     });
 
     if (!selectedAccount) {
