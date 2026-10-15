@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const syncApiKey = process.env.SYNC_API_KEY || "";
 const path = require("path");
 const { DerivPublicFeed } = require("./derivPublic");
-const { lastDigit, analyzeMarket } = require("./analyzer");
+const { lastDigit, formatQuote, analyzeMarket } = require("./analyzer");
 const { makeSignal, isFresh } = require("./signal");
 const { PaperExecution } = require("./paperExecution");
 const { DerivDemoExecutor } = require("./derivDemoExecution");
@@ -36,7 +36,7 @@ const realMaxDailyStake = Math.max(realMaxStake, Number(process.env.REAL_MAX_DAI
 const demoDaily = { date: new Date().toISOString().slice(0, 10), trades: 0, stake: 0 };
 const realDaily = { date: new Date().toISOString().slice(0, 10), trades: 0, stake: 0 };
 const staleAfterMs = Math.max(3000, Number(process.env.STALE_AFTER_MS || 10000));
-const markets = Object.fromEntries(symbols.map(symbol => [symbol, { ticks: [], latestQuote: null, latestEpoch: null, lastTickAt: null, tickCount: 0 }]));
+const markets = Object.fromEntries(symbols.map(symbol => [symbol, { ticks: [], latestQuote: null, latestDisplayQuote: null, latestDisplayDigit: null, pipSize: null, precisionWarningLogged: false, latestEpoch: null, lastTickAt: null, tickCount: 0 }]));
 let feedStatus = { connected: false, message: appId ? "Waiting for feed…" : "Set DERIV_APP_ID to connect." };
 let latestSignal = null, signalCount = 0, startedAt = Date.now(), feed = null, lastTickAt = null;
 const receivedSourceIds = new Set();
@@ -111,7 +111,8 @@ function getRankedMarkets() {
   return symbols.map(symbol => {
     const state = markets[symbol];
     const tickAgeMs = state.lastTickAt === null ? null : Date.now() - state.lastTickAt;
-    return { symbol, latestQuote: state.latestQuote, latestEpoch: state.latestEpoch,
+    return { symbol, latestQuote: state.latestQuote, latestDisplayQuote: state.latestDisplayQuote,
+      latestDisplayDigit: state.latestDisplayDigit, pipSize: state.pipSize, latestEpoch: state.latestEpoch,
       lastTickAt: state.lastTickAt, tickAgeMs, tickCount: state.tickCount,
       dataFresh: tickAgeMs !== null && tickAgeMs <= staleAfterMs,
       ...analyzeMarket(state.ticks, minSamples) };
@@ -120,11 +121,24 @@ function getRankedMarkets() {
 function handleTick(tick) {
   const symbol = tick.symbol;
   if (!markets[symbol]) return;
-  const digit = lastDigit(tick.quote);
+  const pipSize = tick.pip_size ?? tick.pip ?? null;
+  const precision = Number(pipSize);
+  // Do not silently count a guessed digit if displayed precision is unknown.
+  if (pipSize === null || pipSize === undefined || !Number.isInteger(precision) || precision < 0 || precision > 10) {
+    if (!markets[symbol].precisionWarningLogged) {
+      markets[symbol].precisionWarningLogged = true;
+      console.warn("Waiting for Deriv display precision before counting digits:", symbol);
+    }
+    return;
+  }
+  const digit = lastDigit(tick.quote, precision);
   if (!Number.isInteger(digit)) return;
   const now = Date.now();
   const market = markets[symbol];
+  market.pipSize = precision;
   market.latestQuote = String(tick.quote);
+  market.latestDisplayQuote = formatQuote(tick.quote, precision);
+  market.latestDisplayDigit = digit;
   market.latestEpoch = tick.epoch || Math.floor(now / 1000);
   market.lastTickAt = now;
   market.tickCount++;
