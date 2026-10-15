@@ -1136,8 +1136,8 @@ function render(){
   $("predictionText").textContent=`MATCH ${a.pred}`;
   $("score").textContent=(a.ranked.find(x=>x.d===a.pred).score*1000).toFixed(1);
   $("agreement").textContent=`${a.agreement}/4`;
-  $("reason").textContent=`Models: ${a.preds.join(", ")} · recent ${(a.rf[a.pred]*100).toFixed(1)}% · transition ${(a.tr[a.pred]*100).toFixed(1)}% · entropy ${a.entropy.toFixed(2)}. Ranking score is not a probability.`;
-  $("digitGrid").innerHTML=a.ranked.map((x,i)=>`<div class="digit ${x.d===a.pred?"selected":""}"><strong>${x.d}</strong><div class="small">#${i+1}</div><div class="small">${(x.score*1000).toFixed(1)}</div></div>`).join("");
+  $("reason").textContent=`One selected digit: ${a.pred}. Agreement ${a.agreement}/4. Score is a model-strength measure, not a win probability.`;
+  $("digitGrid").innerHTML=`<div class="digit selected"><strong>${a.pred}</strong><div class="small">SELECTED DIGIT</div></div>`;
 }
 
 function startMarket(symbol){
