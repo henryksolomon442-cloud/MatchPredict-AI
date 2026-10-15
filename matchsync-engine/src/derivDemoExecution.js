@@ -285,6 +285,32 @@ class DerivDemoExecutor {
     if (!Number.isFinite(askPrice) || askPrice <= 0)
       throw new Error("Deriv returned an invalid proposal price");
 
+    // A consensus score is not a calibrated win probability. Until the system
+    // proves an out-of-sample edge, compare the quote against the fair-odds
+    // baseline rather than treating 4/4 agreement as an advantage.
+    const quotedPayout = Number(proposalMsg.proposal.payout);
+    const baselineWinProbability = contractType === "DIGITMATCH" ? 0.10 : 0.50;
+    if (!Number.isFinite(quotedPayout) || quotedPayout <= 0) {
+      return {
+        ok: false, status: "blocked", reason: "MISSING_VALID_QUOTED_PAYOUT",
+        askPrice, quotedPayout: Number.isFinite(quotedPayout) ? quotedPayout : null
+      };
+    }
+    const breakEvenProbability = askPrice / quotedPayout;
+    const baselineExpectedProfit = baselineWinProbability * quotedPayout - askPrice;
+    if (baselineExpectedProfit <= 0) {
+      console.warn("[DerivDemoExecutor] Trade blocked: no demonstrated positive baseline expectancy", JSON.stringify({
+        symbol: signal.symbol, contractType, matchDigit: signal.matchDigit,
+        askPrice, quotedPayout, baselineWinProbability, breakEvenProbability,
+        baselineExpectedProfit
+      }));
+      return {
+        ok: false, status: "blocked", reason: "NO_POSITIVE_BASELINE_EXPECTED_VALUE",
+        askPrice, quotedPayout, baselineWinProbability, breakEvenProbability,
+        baselineExpectedProfit
+      };
+    }
+
     const ageBeforeBuy = Date.now() - sourceGeneratedAt;
     // Do not start a purchase if the remaining round trip could push the
     // prediction-to-execution path beyond the 7-second target.
