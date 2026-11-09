@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V75 RiseFall Engine</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,Arial,sans-serif;background:#0b1020;color:#e8edf8}
+*{box-sizing:border-box}body{margin:0;padding:18px;max-width:980px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:clamp(23px,5vw,34px);margin:8px 0}p{color:#aab5ca;line-height:1.5}
+.pill,.card{background:#151e33;border:1px solid #293652;border-radius:16px;padding:16px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.big{font-size:34px;font-weight:800;letter-spacing:.5px}.muted{color:#9ba9c2;font-size:13px}
+.green{color:#5ee0a0}.red{color:#ff7777}.yellow{color:#f5cf70}
+.value{font-size:22px;font-weight:700;margin-top:8px}
+#signal{font-size:38px;font-weight:900;margin:8px 0}
+button{background:#263754;color:#fff;border:0;padding:11px 15px;border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:9px;border-bottom:1px solid #293652}
+.scroll{overflow:auto;max-height:260px}.notice{font-size:12px;color:#aab5ca;margin:18px 0}
+@media(max-width:540px){.grid{grid-template-columns:1fr}.big{font-size:30px}}
+</style></head><body>
+<header><div><div class="muted">DERIV · CONTINUOUS INDICES</div><h1>V75 RiseFall Engine</h1></div><div class="pill" id="connection">Connecting to R_75…</div></header>
+<p>Live Volatility 75 feed · 100-tick rolling window · 2-tick observation signals</p>
+<div class="grid">
+<section class="card"><div class="muted">LATEST PRICE · R_75</div><div class="value" id="price">—</div><div class="muted" id="tickcount">0 ticks received</div></section>
+<section class="card"><div class="muted">CURRENT SIGNAL</div><div id="signal" class="yellow">WAIT</div><div class="muted" id="reason">Waiting for data</div></section>
+<section class="card"><div class="muted">SIGNAL STRENGTH · HEURISTIC</div><div class="value" id="strength">—</div><div class="muted">Not a probability or guaranteed edge</div></section>
+<section class="card"><div class="muted">2-TICK TEST RESULTS</div><div class="value" id="accuracy">Not enough results</div><div class="muted" id="evaluated">0 evaluated signals</div></section>
+</div>
+<section class="card"><div class="muted">RECENT TICKS</div><div class="scroll"><table><thead><tr><th>Time</th><th>R_75 quote</th></tr></thead><tbody id="ticks"></tbody></table></div></section>
+<section class="card" style="margin-top:12px"><div class="muted">RECENT 2-TICK EVALUATIONS</div><div class="scroll"><table><thead><tr><th>Signal</th><th>Start</th><th>After 2 ticks</th><th>Result</th></tr></thead><tbody id="results"></tbody></table></div></section>
+<div class="notice">Observation only. No trades are placed. RISE/FALL outcomes are evaluated after two subsequent ticks. The momentum score is experimental and must be tested on unseen data before it can be considered useful. A live feed connection does not prove predictive accuracy.</div>
+<script>
+const $=id=>document.getElementById(id);
+function renderStatus(s){
+  $("connection").textContent=s.connected?"● LIVE FEED":"○ DISCONNECTED";
+  $("connection").style.color=s.connected?"#5ee0a0":"#ff7777";
+  $("tickcount").textContent=s.tickCount+" ticks received · "+s.bufferedTicks+"/100 buffered";
+  $("price").textContent=s.latestPrice??"—";
+  $("evaluated").textContent=s.evaluated+" evaluated signals";
+  $("accuracy").textContent=s.accuracy==null?"Not enough results":(s.accuracy*100).toFixed(1)+"%";
+}
+function renderSignal(s){
+  $("signal").textContent=s.direction;
+  $("signal").className=s.direction==="RISE"?"green":s.direction==="FALL"?"red":"yellow";
+  $("reason").textContent=s.reason||"";
+  $("strength").textContent=s.strength??"—";
+}
+function addTick(t){
+  const tr=document.createElement("tr");
+  const time=new Date(t.epoch*1000).toLocaleTimeString();
+  tr.innerHTML="<td>"+time+"</td><td>"+t.quote+"</td>";
+  $("ticks").prepend(tr);while($("ticks").children.length>35)$("ticks").lastChild.remove();
+}
+function addResult(r){
+  const tr=document.createElement("tr");
+  const good=r.correct===true, bad=r.correct===false;
+  tr.innerHTML="<td>"+r.direction+"</td><td>"+r.startPrice+"</td><td>"+r.endPrice+"</td><td class='"+(good?"green":bad?"red":"yellow")+"'>"+(good?"CORRECT":bad?"WRONG":"FLAT")+"</td>";
+  $("results").prepend(tr);while($("results").children.length>35)$("results").lastChild.remove();
+}
+fetch("/api/history").then(r=>r.json()).then(d=>{
+  d.ticks.slice().reverse().forEach(addTick);
+  d.results.slice().reverse().forEach(addResult);
+  renderSignal(d.signal);
+}).catch(()=>{});
+fetch("/api/status").then(r=>r.json()).then(renderStatus).catch(()=>{});
+const events=new EventSource("/events");
+events.addEventListener("snapshot",e=>{
+  const d=JSON.parse(e.data);renderStatus(d.status);renderSignal(d.status.latestSignal);
+});
+events.addEventListener("status",e=>renderStatus(JSON.parse(e.data)));
+events.addEventListener("tick",e=>{
+  const d=JSON.parse(e.data);addTick(d.tick);renderStatus(d.status);renderSignal(d.signal);
+});
+events.addEventListener("evaluation",e=>addResult(JSON.parse(e.data)));
+events.onerror=()=>{$("connection").textContent="Reconnecting…";$("connection").style.color="#f5cf70"};
+</script></body></html>
