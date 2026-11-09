@@ -5,7 +5,6 @@ const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-const APP_ID = process.env.DERIV_APP_ID || "1089";
 const SYMBOL = "R_75";
 const WINDOW = 100;
 const TICKS = [];
@@ -16,6 +15,8 @@ let connected = false;
 let reconnectTimer;
 let lastMessageAt = null;
 let lastError = null;
+let lastClose = null;
+let heartbeatTimer = null;
 let pending = [];
 let tickCount = 0;
 let latestSignal = { direction: "WAIT", strength: 0, reason: "Waiting for live ticks", at: null };
@@ -24,7 +25,7 @@ app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "v75.html")));
 app.get("/health", (_req, res) => res.json({ ok: true, app: "V75 RiseFall Engine", symbol: SYMBOL, connected, tickCount }));
 app.get("/api/status", (_req, res) => res.json({
   app: "V75 RiseFall Engine", symbol: SYMBOL, connected, tickCount,
-  bufferedTicks: TICKS.length, lastMessageAt, lastError,
+  bufferedTicks: TICKS.length, lastMessageAt, lastError, lastClose,
   latestPrice: TICKS.length ? TICKS[TICKS.length - 1].quote : null,
   latestSignal, evaluated: RESULTS.length,
   accuracy: RESULTS.length ? RESULTS.filter(x => x.correct).length / RESULTS.length : null
@@ -100,23 +101,66 @@ function onTick(raw) {
 }
 function connect() {
   clearTimeout(reconnectTimer);
-  const url = `wss://ws.derivws.com/websockets/v3?app_id=${encodeURIComponent(APP_ID)}`;
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  // Current Deriv public market-data WebSocket. No account token or App ID is needed.
+  const url = "wss://api.derivws.com/trading/v1/options/ws/public";
+  console.log(`[DerivWS] Connecting to public market-data endpoint for ${SYMBOL}`);
   upstream = new WebSocket(url);
+
   upstream.on("open", () => {
-    connected = true; lastError = null;
+    connected = true;
+    lastError = null;
+    lastClose = null;
+    console.log("[DerivWS] WebSocket handshake succeeded; subscribing to", SYMBOL);
+    upstream.send(JSON.stringify({ ticks: SYMBOL, subscribe: 1, req_id: 1 }));
+    heartbeatTimer = setInterval(() => {
+      if (upstream && upstream.readyState === WebSocket.OPEN) {
+        upstream.send(JSON.stringify({ ping: 1, req_id: 99 }));
+      }
+    }, 30000);
     emit("status", statusPayload());
-    upstream.send(JSON.stringify({ ticks: SYMBOL, subscribe: 1 }));
   });
+
   upstream.on("message", buf => {
+    lastMessageAt = Date.now();
     let msg;
-    try { msg = JSON.parse(buf.toString()); } catch { return; }
-    if (msg.error) { lastError = msg.error.message || "Deriv API error"; emit("status", statusPayload()); return; }
-    if (msg.msg_type === "tick" && msg.tick) onTick(msg.tick);
+    try { msg = JSON.parse(buf.toString()); } catch (err) {
+      console.error("[DerivWS] Could not parse message:", err.message);
+      return;
+    }
+    if (msg.error || (msg.errors && msg.errors.length)) {
+      lastError = msg.error?.message || msg.errors?.[0]?.message || "Deriv API returned an error";
+      console.error("[DerivWS] API response error:", JSON.stringify(msg.error || msg.errors));
+      emit("status", statusPayload());
+      return;
+    }
+    if (msg.msg_type === "tick" && msg.tick) {
+      onTick(msg.tick);
+    } else {
+      console.log("[DerivWS] Received message type:", msg.msg_type || "untyped");
+    }
   });
-  upstream.on("error", err => { lastError = err.message; });
-  upstream.on("close", () => {
-    connected = false; emit("status", statusPayload());
-    reconnectTimer = setTimeout(connect, 3000);
+
+  upstream.on("unexpected-response", (_request, response) => {
+    lastError = `WebSocket handshake HTTP ${response.statusCode}`;
+    console.error("[DerivWS] Handshake rejected:", response.statusCode, response.statusMessage);
+  });
+
+  upstream.on("error", err => {
+    lastError = err.message;
+    console.error("[DerivWS] Socket error:", err.message);
+  });
+
+  upstream.on("close", (code, reason) => {
+    connected = false;
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    lastClose = { code, reason: reason.toString() };
+    console.error("[DerivWS] Closed:", code, reason.toString() || "(no reason)");
+    emit("status", statusPayload());
+    reconnectTimer = setTimeout(connect, 5000);
   });
 }
-app.listen(PORT, () => { console.log(`V75 RiseFall Engine listening on ${PORT}`); connect(); });
+app.listen(PORT, () => {
+  console.log(`V75 RiseFall Engine listening on ${PORT}`);
+  connect();
+});
