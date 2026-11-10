@@ -72,6 +72,8 @@ function probabilities(windowDigits) {
     }
   }
   const m2 = normalizeProb(trans2.map((c, j) => c + 3 * m1[j]));
+  // Hierarchical Bayesian backoff: sparse two-digit contexts shrink toward first-order transitions.
+  const hierarchical = normalizeProb(trans2.map((c, j) => c + 10 * m1[j]));
 
   const blend = normalizeProb(freq.map((v, j) =>
     0.15 * v + 0.20 * recency[j] + 0.40 * m1[j] + 0.25 * m2[j]
@@ -82,6 +84,7 @@ function probabilities(windowDigits) {
     recency: recency,
     markov1: m1,
     markov2: m2,
+    hierarchical: hierarchical,
     ensemble: blend,
     context: { lastDigit: last, previousDigit: pairA, transitions1: trans1Total, transitions2: trans2Total }
   };
@@ -130,12 +133,13 @@ function scoreModel(name, probabilitiesList, actualDigits) {
 
 function runBacktest(historyTicks) {
   const digits = historyTicks.map(t => t.digit);
-  const modelNames = ["frequency", "recency", "markov1", "markov2", "ensemble"];
+  const modelNames = ["frequency", "recency", "markov1", "markov2", "hierarchical", "ensemble", "uniform"];
   const probabilityLists = Object.fromEntries(modelNames.map(n => [n, []]));
+  const uniform = Array(10).fill(0.1);
   const actuals = [];
   for (let i = WINDOW; i < digits.length; i++) {
     const p = probabilities(digits.slice(i - WINDOW, i));
-    for (const name of modelNames) probabilityLists[name].push(p[name]);
+    for (const name of modelNames) probabilityLists[name].push(name === "uniform" ? uniform : p[name]);
     actuals.push(digits[i]);
   }
   const metrics = modelNames.map(name => scoreModel(name, probabilityLists[name], actuals));
@@ -155,7 +159,7 @@ function runBacktest(historyTicks) {
       candidateDigit: argmax(current.ensemble),
       candidateProbabilityPercent: Number((Math.max(...current.ensemble) * 100).toFixed(3)),
       probabilitiesPercent: current.ensemble.map(v => Number((v * 100).toFixed(3))),
-      components: Object.fromEntries(modelNames.filter(n => n !== "ensemble").map(n => [
+      components: Object.fromEntries(modelNames.filter(n => n !== "ensemble" && n !== "uniform").map(n => [
         n, { digit: argmax(current[n]), probabilityPercent: Number((Math.max(...current[n]) * 100).toFixed(3)) }
       ])),
       context: current.context
