@@ -20,9 +20,13 @@ let liveSocket = null;
 let liveResults = [];
 let livePrediction = null;
 let report = null;
+let latestTick = null;
 
 function digitFromPrice(price, pipSize) {
-  const places = Number.isInteger(Number(pipSize)) ? Math.max(0, Math.min(10, Number(pipSize))) : 2;
+  const places = Number(pipSize);
+  if (!Number.isInteger(places) || places < 0 || places > 10) {
+    throw new Error("Missing or invalid Deriv pip_size; refusing to guess the final digit.");
+  }
   const fixed = Number(price).toFixed(places);
   const match = fixed.match(/(\d)$/);
   if (!match) throw new Error("Cannot extract final digit from price " + price);
@@ -196,7 +200,13 @@ function requestHistoryPage(count, end) {
       clearTimeout(timer);
       const prices = msg.history.prices || [];
       const times = msg.history.times || [];
-      const pipSize = Number(msg.pip_size ?? 2);
+      const pipSize = Number(msg.pip_size);
+      if (!Number.isInteger(pipSize) || pipSize < 0 || pipSize > 10) {
+        clearTimeout(timer);
+        ws.close();
+        reject(new Error("Deriv history response did not provide a valid pip_size; refusing to guess digits."));
+        return;
+      }
       const rows = prices.map((price, i) => ({
         quote: Number(price),
         epoch: Number(times[i]),
@@ -275,13 +285,18 @@ function connectLive() {
     }
     if (msg.msg_type !== "tick" || !msg.tick) return;
     const t = msg.tick;
-    const pipSize = Number(t.pip_size ?? (ticks[ticks.length - 1] && ticks[ticks.length - 1].pipSize) ?? 2);
+    const pipSize = Number(t.pip_size);
+    if (!Number.isInteger(pipSize) || pipSize < 0 || pipSize > 10) {
+      console.error("[live] missing or invalid tick.pip_size; refusing to extract a digit");
+      return;
+    }
     const quote = Number(t.quote);
     const epoch = Number(t.epoch);
     if (!Number.isFinite(quote) || !Number.isFinite(epoch)) return;
     const last = ticks[ticks.length - 1];
     if (last && epoch === last.epoch && quote === last.quote) return;
     const digit = digitFromPrice(t.quote, pipSize);
+    latestTick = { quote: quote, formattedQuote: quote.toFixed(pipSize), pipSize: pipSize, digit: digit, epoch: epoch };
     const prior = ticks.slice(-WINDOW).map(x => x.digit);
     if (prior.length === WINDOW) {
       const p = probabilities(prior);
@@ -318,6 +333,7 @@ app.get("/api/status", (_req, res) => res.json({
   lastMessageAt: lastMessageAt,
   livePredictions: liveResults.length,
   liveAccuracy: liveResults.length ? liveResults.filter(x => x.correct).length / liveResults.length : null,
+  latestTick: latestTick,
   latestLivePrediction: livePrediction
 }));
 app.get("/api/report", (_req, res) => {
