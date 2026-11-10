@@ -22,6 +22,9 @@ let livePrediction = null;
 let report = null;
 let latestTick = null;
 let liveTickLogCount = 0;
+let liveTickCount = 0;
+let liveReconnectCount = 0;
+const liveModelStats = Object.create(null);
 
 function digitFromPrice(price, pipSize) {
   const places = Number(pipSize);
@@ -136,6 +139,71 @@ function scoreModel(name, probabilitiesList, actualDigits) {
   };
 }
 
+function gammaQ(a, x) {
+  if (!(a > 0) || x < 0) return NaN;
+  if (x === 0) return 1;
+  const gln = logGamma(a);
+  if (x < a + 1) {
+    let ap = a, sum = 1 / a, del = sum;
+    for (let n = 1; n <= 300; n++) { ap++; del *= x / ap; sum += del; if (Math.abs(del) < Math.abs(sum) * 1e-14) break; }
+    const p = sum * Math.exp(-x + a * Math.log(x) - gln);
+    return Math.max(0, Math.min(1, 1 - p));
+  }
+  let b = x + 1 - a, c = 1e300, d = 1 / b, h = d;
+  for (let i = 1; i <= 300; i++) {
+    const an = -i * (i - a); b += 2; d = an * d + b;
+    if (Math.abs(d) < 1e-300) d = 1e-300;
+    c = b + an / c; if (Math.abs(c) < 1e-300) c = 1e-300;
+    d = 1 / d; const delta = d * c; h *= delta;
+    if (Math.abs(delta - 1) < 1e-14) break;
+  }
+  return Math.max(0, Math.min(1, Math.exp(-x + a * Math.log(x) - gln) * h));
+}
+function logGamma(z) {
+  const p = [676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if (z < 0.5) return Math.log(Math.PI) - Math.log(Math.sin(Math.PI*z)) - logGamma(1-z);
+  z -= 1; let x = 0.99999999999980993;
+  for (let i=0;i<p.length;i++) x += p[i]/(z+i+1);
+  const t=z+p.length-0.5;
+  return 0.5*Math.log(2*Math.PI)+(z+0.5)*Math.log(t)-t+Math.log(x);
+}
+function sequenceDiagnostics(digits) {
+  const counts=Array(10).fill(0), transitions=Array.from({length:10},()=>Array(10).fill(0));
+  for(let i=0;i<digits.length;i++){counts[digits[i]]++; if(i) transitions[digits[i-1]][digits[i]]++;}
+  const n=digits.length, expected=n/10;
+  const frequencyChi=counts.reduce((v,c)=>v+(c-expected)**2/expected,0);
+  const rows=transitions.map(r=>r.reduce((a,b)=>a+b,0));
+  const cols=Array(10).fill(0); for(let i=0;i<10;i++)for(let j=0;j<10;j++)cols[j]+=transitions[i][j];
+  let transitionChi=0, transitionCells=0;
+  const total=n-1;
+  for(let i=0;i<10;i++)for(let j=0;j<10;j++){
+    const e=rows[i]*cols[j]/total;
+    if(e>0){transitionChi+=(transitions[i][j]-e)**2/e;transitionCells++;}
+  }
+  const even=digits.filter(d=>d%2===0).length, odd=n-even;
+  let runs=0; for(let i=0;i<n;i++)if(i===0||((digits[i]%2)!==(digits[i-1]%2)))runs++;
+  const runsMean=1+2*even*odd/n;
+  const runsVar=(2*even*odd*(2*even*odd-n))/(n*n*(n-1));
+  const runsZ=runsVar>0?(runs-runsMean)/Math.sqrt(runsVar):0;
+  return {
+    ticks:n, digitCounts:counts,
+    frequencyChiSquare:Number(frequencyChi.toFixed(3)),
+    frequencyPValue:Number(gammaQ(4.5,frequencyChi/2).toPrecision(5)),
+    transitionIndependenceChiSquare:Number(transitionChi.toFixed(3)),
+    transitionDegreesOfFreedom:81,
+    transitionPValue:Number(gammaQ(40.5,transitionChi/2).toPrecision(5)),
+    parityRuns:{runs,expected:Number(runsMean.toFixed(2)),z:Number(runsZ.toFixed(3))}
+  };
+}
+function scoreBarrierStrategies(actuals) {
+  const rules=[
+    ["UNDER_8",d=>d<8],["OVER_1",d=>d>1],
+    ["UNDER_7",d=>d<7],["OVER_2",d=>d>2],
+    ["UNDER_6",d=>d<6],["OVER_3",d=>d>3]
+  ];
+  return rules.map(([name,fn])=>{const wins=actuals.filter(fn).length;return {strategy:name,wins,total:actuals.length,winRatePercent:Number((wins/actuals.length*100).toFixed(3))};});
+}
+
 function runBacktest(historyTicks) {
   const digits = historyTicks.map(t => t.digit);
   const modelNames = ["frequency", "recency", "markov1", "markov2", "hierarchical", "ensemble", "uniform"];
@@ -159,6 +227,8 @@ function runBacktest(historyTicks) {
     expectedPredictions: TEST_PREDICTIONS,
     pipSize: historyTicks[historyTicks.length - 1].pipSize,
     metrics: metrics,
+    diagnostics: sequenceDiagnostics(digits),
+    barrierStrategies: scoreBarrierStrategies(actuals),
     latest: {
       latestObservedDigit: lastWindow[lastWindow.length - 1],
       candidateDigit: argmax(current.ensemble),
@@ -275,7 +345,8 @@ function connectLive() {
   liveSocket = new WebSocket(WS_URL);
   liveSocket.on("open", () => {
     liveConnected = true;
-    console.log("[live] WebSocket connected; subscribing to " + SYMBOL);
+    liveReconnectCount++;
+    console.log("[live] WebSocket connected; subscribing to " + SYMBOL + " (connection " + liveReconnectCount + ")");
     liveSocket.send(JSON.stringify({ ticks: SYMBOL, subscribe: 1, req_id: 22 }));
   });
   liveSocket.on("message", raw => {
@@ -306,18 +377,27 @@ function connectLive() {
     const prior = ticks.slice(-WINDOW).map(x => x.digit);
     if (prior.length === WINDOW) {
       const p = probabilities(prior);
+      const forecasts = {frequency:p.frequency,recency:p.recency,markov1:p.markov1,markov2:p.markov2,hierarchical:p.hierarchical,ensemble:p.ensemble,uniform:Array(10).fill(0.1)};
+      for (const [name, forecast] of Object.entries(forecasts)) {
+        const predicted = argmax(forecast);
+        const state = liveModelStats[name] || (liveModelStats[name]={n:0,correct:0,logLoss:0,brier:0});
+        state.n++; if(predicted===digit)state.correct++;
+        state.logLoss -= Math.log(Math.max(1e-12,forecast[digit]));
+        for(let j=0;j<10;j++){const e=forecast[j]-(j===digit?1:0);state.brier+=e*e;}
+      }
       const predicted = argmax(p.ensemble);
       livePrediction = { predictedDigit: predicted, probabilityPercent: Number((p.ensemble[predicted] * 100).toFixed(3)), issuedAt: Date.now() };
       liveResults.push({ predicted: predicted, actual: digit, correct: predicted === digit, at: epoch });
       if (liveResults.length > 10000) liveResults.shift();
     }
+    liveTickCount++;
     ticks.push({ quote: quote, epoch: epoch, pipSize: pipSize, digit: digit });
     if (ticks.length > 20000) ticks.shift();
     lastMessageAt = Date.now();
   });
-  liveSocket.on("close", () => {
+  liveSocket.on("close", (code, reason) => {
     liveConnected = false;
-    console.warn("[live] WebSocket closed; reconnecting in 5 seconds");
+    console.warn("[live] WebSocket closed code=" + code + " reason=" + String(reason || "") + "; reconnecting in 5 seconds");
     setTimeout(connectLive, 5000);
   });
   liveSocket.on("error", err => {
@@ -339,6 +419,9 @@ app.get("/api/status", (_req, res) => res.json({
   liveConnected: liveConnected,
   lastMessageAt: lastMessageAt,
   livePredictions: liveResults.length,
+  liveTickCount: liveTickCount,
+  liveReconnectCount: liveReconnectCount,
+  liveModelStats: Object.fromEntries(Object.entries(liveModelStats).map(([name,v])=>[name,{predictions:v.n,accuracyPercent:Number((v.correct/v.n*100).toFixed(3)),meanLogLoss:Number((v.logLoss/v.n).toFixed(5)),meanBrier:Number((v.brier/v.n).toFixed(5))}])),
   liveAccuracy: liveResults.length ? liveResults.filter(x => x.correct).length / liveResults.length : null,
   latestTick: latestTick,
   latestLivePrediction: livePrediction
