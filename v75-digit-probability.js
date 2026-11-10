@@ -195,13 +195,23 @@ function sequenceDiagnostics(digits) {
     parityRuns:{runs,expected:Number(runsMean.toFixed(2)),z:Number(runsZ.toFixed(3))}
   };
 }
-function scoreBarrierStrategies(actuals) {
+function scoreBarrierStrategies(digits) {
+  const actuals=digits.slice(WINDOW);
   const rules=[
     ["UNDER_8",d=>d<8],["OVER_1",d=>d>1],
     ["UNDER_7",d=>d<7],["OVER_2",d=>d>2],
     ["UNDER_6",d=>d<6],["OVER_3",d=>d>3]
   ];
-  return rules.map(([name,fn])=>{const wins=actuals.filter(fn).length;return {strategy:name,wins,total:actuals.length,winRatePercent:Number((wins/actuals.length*100).toFixed(3))};});
+  const results=rules.map(([name,fn])=>{const wins=actuals.filter(fn).length;return {strategy:name,wins,total:actuals.length,winRatePercent:Number((wins/actuals.length*100).toFixed(3))};});
+  let differsWins=0;
+  for(let i=WINDOW;i<digits.length;i++){
+    const counts=Array(10).fill(0);
+    for(const d of digits.slice(i-WINDOW,i))counts[d]++;
+    let excluded=0;for(let d=1;d<10;d++)if(counts[d]<counts[excluded])excluded=d;
+    if(digits[i]!==excluded)differsWins++;
+  }
+  results.push({strategy:"DIFFERS (exclude least-frequent recent digit)",wins:differsWins,total:actuals.length,winRatePercent:Number((differsWins/actuals.length*100).toFixed(3))});
+  return results;
 }
 
 function runBacktest(historyTicks) {
@@ -228,7 +238,7 @@ function runBacktest(historyTicks) {
     pipSize: historyTicks[historyTicks.length - 1].pipSize,
     metrics: metrics,
     diagnostics: sequenceDiagnostics(digits),
-    barrierStrategies: scoreBarrierStrategies(actuals),
+    barrierStrategies: scoreBarrierStrategies(digits),
     latest: {
       latestObservedDigit: lastWindow[lastWindow.length - 1],
       candidateDigit: argmax(current.ensemble),
