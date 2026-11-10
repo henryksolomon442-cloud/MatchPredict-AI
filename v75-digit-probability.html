@@ -23,10 +23,16 @@ a{color:#93c5fd}
   <div class="muted">R_75 · last 100 digits · one-tick-ahead research</div>
   <p><span class="status" id="state">Starting history test…</span></p>
   <div class="muted" id="rawtick">Waiting for a live tick with Deriv precision…</div>
+  <div class="muted" id="feedidentity">Instrument: R_75 · source: Deriv live tick subscription</div>
   <div class="muted">Current candidate</div>
   <div class="big" id="candidate">—</div>
   <div class="muted" id="confidence">Waiting for 10,100 historical ticks</div>
 </header>
+<section class="panel">
+  <h2>Recent live digits — compare with Deriv</h2>
+  <div class="muted">These are actual received R_75 ticks, not predicted digits. Newest tick appears last.</div>
+  <div id="livetrail" class="muted">Waiting for live ticks…</div>
+</section>
 <section class="panel">
   <h2>Probability for each digit</h2>
   <div class="grid" id="digits"></div>
@@ -68,8 +74,10 @@ async function refresh(){
   state.className='status '+(s.backtest?'good':'warn');
   document.getElementById('live').textContent='Live feed: '+(s.liveConnected?'connected':'connecting')+' · scored live predictions: '+s.livePredictions+' · accuracy: '+(s.liveAccuracy===null?'—':(s.liveAccuracy*100).toFixed(2)+'%');
   if(s.latestTick){
-   document.getElementById('rawtick').textContent='Latest Deriv quote: '+s.latestTick.formattedQuote+' · pip_size: '+s.latestTick.pipSize+' · extracted final digit: '+s.latestTick.digit+' · epoch: '+s.latestTick.epoch;
+   document.getElementById('rawtick').textContent='Latest live quote: '+s.latestTick.formattedQuote+' · extracted digit: '+s.latestTick.digit+' · epoch: '+s.latestTick.epoch;
+   document.getElementById('feedidentity').textContent='Instrument: '+s.latestTick.symbol+' · source: Deriv live tick subscription · precision: '+s.latestTick.pipSize+' decimal places';
   }
+  if(s.liveTickTrail){document.getElementById('livetrail').textContent=s.liveTickTrail.map(x=>x.digit).join('  ·  ')+'   (newest →)';}
   if(s.backtest){
    const p=await fetch('/api/predict').then(r=>r.json());
    document.getElementById('candidate').textContent=p.predictedDigit;
