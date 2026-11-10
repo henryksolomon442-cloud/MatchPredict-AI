@@ -217,7 +217,10 @@ async function loadHistory() {
     let end = "latest";
     let total = 0;
     for (let page = 0; page < 15 && total < HISTORY_REQUIRED; page++) {
-      const rows = await requestHistoryPage(Math.min(PAGE_SIZE, HISTORY_REQUIRED - total), end);
+      const requested = Math.min(PAGE_SIZE, HISTORY_REQUIRED - total);
+      console.log("[history] requesting page " + (page + 1) + ", count=" + requested + ", end=" + end);
+      const rows = await requestHistoryPage(requested, end);
+      console.log("[history] page " + (page + 1) + " returned " + rows.length + " ticks");
       if (!rows.length) break;
       pages.push(rows);
       total += rows.length;
@@ -239,11 +242,14 @@ async function loadHistory() {
     }
     ticks = clean.slice(-HISTORY_REQUIRED);
     report = runBacktest(ticks);
+    console.log("[history] backtest complete: " + report.predictions + " predictions from " + report.historyTicks + " ticks");
+    console.log("[history] model metrics: " + JSON.stringify(report.metrics));
     historyLoaded = true;
     loading = false;
     connectLive();
   } catch (err) {
     loadError = err.message;
+    console.error("[history] load failed: " + err.message);
     loading = false;
     console.error("[history]", err.message);
   }
