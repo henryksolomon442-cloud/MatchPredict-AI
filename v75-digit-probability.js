@@ -21,6 +21,7 @@ let liveResults = [];
 let livePrediction = null;
 let report = null;
 let latestTick = null;
+let liveTickLogCount = 0;
 
 function digitFromPrice(price, pipSize) {
   const places = Number(pipSize);
@@ -274,6 +275,7 @@ function connectLive() {
   liveSocket = new WebSocket(WS_URL);
   liveSocket.on("open", () => {
     liveConnected = true;
+    console.log("[live] WebSocket connected; subscribing to " + SYMBOL);
     liveSocket.send(JSON.stringify({ ticks: SYMBOL, subscribe: 1, req_id: 22 }));
   });
   liveSocket.on("message", raw => {
@@ -297,6 +299,10 @@ function connectLive() {
     if (last && epoch === last.epoch && quote === last.quote) return;
     const digit = digitFromPrice(t.quote, pipSize);
     latestTick = { quote: quote, formattedQuote: quote.toFixed(pipSize), pipSize: pipSize, digit: digit, epoch: epoch };
+    if (liveTickLogCount < 10) {
+      console.log("[live] verified tick quote=" + latestTick.formattedQuote + " pip_size=" + pipSize + " extracted_digit=" + digit + " epoch=" + epoch);
+      liveTickLogCount++;
+    }
     const prior = ticks.slice(-WINDOW).map(x => x.digit);
     if (prior.length === WINDOW) {
       const p = probabilities(prior);
@@ -311,6 +317,7 @@ function connectLive() {
   });
   liveSocket.on("close", () => {
     liveConnected = false;
+    console.warn("[live] WebSocket closed; reconnecting in 5 seconds");
     setTimeout(connectLive, 5000);
   });
   liveSocket.on("error", err => {
