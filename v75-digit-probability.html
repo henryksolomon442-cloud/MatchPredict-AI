@@ -45,9 +45,9 @@ a{color:#93c5fd}
   <h2>Randomness diagnostics</h2>
   <div class="muted" id="diagnostics">Waiting for historical diagnostics…</div>
   <h2 style="margin-top:14px">High-hit-rate barrier tests</h2>
-  <div class="muted">Under 8 and Over 1 cover 8 of 10 digits (80% theoretical hit rate under uniform digits). A high hit rate is not automatically profitable.</div>
+  <div class="muted">Under 8 and Over 1 cover 8 of 10 digits (80% theoretical hit rate). Differs excludes one digit (90% theoretical hit rate). A high hit rate is not automatically profitable.</div>
   <table><thead><tr><th>Rule</th><th>Wins</th><th>Hit rate</th></tr></thead><tbody id="barriers"></tbody></table>
-  <div class="muted">For an 80% hit rate, gross payout must exceed 1.25× stake just to break even, before any practical execution effects.</div>
+  <div class="muted">Break-even gross payout: 1.111× stake at 90% wins; 1.25× at 80%; 1.429× at 70%. Deriv quotes include a house-favouring pricing bias, so use the actual quote and a conservative probability estimate.</div>
 </section>
 <section class="panel">
   <h2>Live forward test — each model</h2>
