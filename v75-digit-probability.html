@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V75 Next Digit Probability</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0b1220;color:#e8eef8}
+body{margin:0;padding:16px;max-width:760px;margin-inline:auto}
+header,.panel{background:#121d30;border:1px solid #263751;border-radius:14px;padding:16px;margin-bottom:14px}
+h1{font-size:22px;margin:0 0 6px}h2{font-size:16px;margin:0 0 12px}
+.muted{color:#9fb0c7;font-size:13px}.big{font-size:42px;font-weight:750}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.cell{background:#1b2a41;border-radius:10px;text-align:center;padding:12px 4px}
+.digit{font-size:21px;font-weight:700}.pct{font-size:13px;color:#b8c8dc}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:9px 5px;border-bottom:1px solid #2a3a52}
+.status{display:inline-block;border-radius:20px;padding:4px 9px;background:#293b53;font-size:12px}
+.good{color:#6ee7b7}.warn{color:#fbbf24}
+a{color:#93c5fd}
+</style></head>
+<body>
+<header>
+  <h1>V75 Next Digit Probability</h1>
+  <div class="muted">R_75 · last 100 digits · one-tick-ahead research</div>
+  <p><span class="status" id="state">Starting history test…</span></p>
+  <div class="muted">Current candidate</div>
+  <div class="big" id="candidate">—</div>
+  <div class="muted" id="confidence">Waiting for 10,100 historical ticks</div>
+</header>
+<section class="panel">
+  <h2>Probability for each digit</h2>
+  <div class="grid" id="digits"></div>
+</section>
+<section class="panel">
+  <h2>10,000-prediction walk-forward test</h2>
+  <div class="muted" id="teststate">Loading historical ticks…</div>
+  <table><thead><tr><th>Model</th><th>Accuracy</th><th>Log loss</th><th>Top confidence</th></tr></thead><tbody id="metrics"></tbody></table>
+  <p class="muted">Each scored prediction uses only the preceding 100 digits. No trades are placed.</p>
+</section>
+<section class="panel">
+  <h2>Live observation</h2>
+  <div class="muted" id="live">Waiting for live subscription…</div>
+</section>
+<script>
+async function refresh(){
+ try{
+  const s=await fetch('/api/status').then(r=>r.json());
+  const state=document.getElementById('state');
+  state.textContent=s.error?'History error: '+s.error:(s.backtest?'Historical test ready':'Loading '+s.historicalTicks+' ticks');
+  state.className='status '+(s.backtest?'good':'warn');
+  document.getElementById('live').textContent='Live feed: '+(s.liveConnected?'connected':'connecting')+' · scored live predictions: '+s.livePredictions+' · accuracy: '+(s.liveAccuracy===null?'—':(s.liveAccuracy*100).toFixed(2)+'%');
+  if(s.backtest){
+   const p=await fetch('/api/predict').then(r=>r.json());
+   document.getElementById('candidate').textContent=p.predictedDigit;
+   document.getElementById('confidence').textContent='Estimated probability '+p.probabilityPercent+'% · latest observed digit '+p.latestObservedDigit;
+   document.getElementById('digits').innerHTML=p.probabilitiesPercent.map((v,i)=>'<div class="cell"><div class="digit">'+i+'</div><div class="pct">'+v+'%</div></div>').join('');
+   document.getElementById('teststate').textContent='Completed '+s.backtest.predictions+' / '+s.backtest.expected+' predictions';
+   document.getElementById('metrics').innerHTML=s.backtest.metrics.map(m=>'<tr><td>'+m.model+'</td><td>'+m.accuracyPercent+'%</td><td>'+m.meanLogLoss+'</td><td>'+m.meanTopProbabilityPercent+'%</td></tr>').join('');
+  }
+ }catch(e){document.getElementById('state').textContent='Cannot reach service';}
+}
+refresh();setInterval(refresh,3000);
+</script>
+</body></html>
