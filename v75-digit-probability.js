@@ -415,7 +415,7 @@ app.get("/api/status", (_req, res) => res.json({
   historyLoaded: historyLoaded,
   error: loadError,
   historicalTicks: ticks.length,
-  backtest: report ? { predictions: report.predictions, expected: report.expectedPredictions, metrics: report.metrics } : null,
+  backtest: report ? { predictions: report.predictions, expected: report.expectedPredictions, metrics: report.metrics, diagnostics: report.diagnostics, barrierStrategies: report.barrierStrategies } : null,
   liveConnected: liveConnected,
   lastMessageAt: lastMessageAt,
   livePredictions: liveResults.length,
