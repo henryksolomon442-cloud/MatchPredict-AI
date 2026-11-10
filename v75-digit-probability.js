@@ -216,6 +216,51 @@ function scoreBarrierStrategies(digits) {
   return results;
 }
 
+function regimeFeatures(windowDigits, p) {
+  const counts=Array(10).fill(0);
+  for(const d of windowDigits)counts[d]++;
+  const n=windowDigits.length;
+  const entropy=-counts.reduce((sum,c)=>{if(!c)return sum;const q=c/n;return sum+q*Math.log(q);},0);
+  let streak=1;for(let i=n-2;i>=0&&windowDigits[i]===windowDigits[n-1];i--)streak++;
+  return {
+    entropy,
+    topFrequency:Math.max(...counts)/n,
+    lastDigitStreak:streak,
+    lastDigitTransitionSupport:p.context.transitions1,
+    topModelProbability:Math.max(...p.ensemble),
+    modelAgreement:["frequency","recency","markov1","markov2","hierarchical"].filter(k=>argmax(p[k])===argmax(p.ensemble)).length
+  };
+}
+function wilsonInterval(wins,n) {
+  if(!n)return null;
+  const z=1.96, phat=wins/n, den=1+z*z/n;
+  const mid=(phat+z*z/(2*n))/den;
+  const half=z*Math.sqrt(phat*(1-phat)/n+z*z/(4*n*n))/den;
+  return [Number((100*(mid-half)).toFixed(2)),Number((100*(mid+half)).toFixed(2))];
+}
+function regimeBacktest(historyTicks) {
+  const digits=historyTicks.map(t=>t.digit), groups={};
+  const add=(key,hit,prob)=>{const g=groups[key]||(groups[key]={n:0,wins:0,logLoss:0,topProb:0});g.n++;if(hit)g.wins++;g.logLoss-=Math.log(Math.max(1e-12,prob));g.topProb+=prob;};
+  for(let i=WINDOW;i<digits.length;i++){
+    const w=digits.slice(i-WINDOW,i), p=probabilities(w), actual=digits[i], feat=regimeFeatures(w,p);
+    const candidate=argmax(p.ensemble), hit=candidate===actual;
+    const confidence=feat.topModelProbability;
+    const confidenceBand=confidence<0.12?"confidence <12%":confidence<0.15?"confidence 12–15%":"confidence >=15%";
+    const entropyBand=feat.entropy<2.20?"low entropy <2.20":"high entropy >=2.20";
+    const streakBand=feat.lastDigitStreak>=2?"same-digit streak >=2":"no repeat streak";
+    const supportBand=feat.lastDigitTransitionSupport<5?"transition support <5":"transition support >=5";
+    const agreementBand=feat.modelAgreement>=4?"model agreement >=4/5":"model agreement <4/5";
+    for(const [name,key] of [["confidence",confidenceBand],["entropy",entropyBand],["streak",streakBand],["transition support",supportBand],["model agreement",agreementBand]])add(name+" | "+key,hit,p.ensemble[actual]);
+  }
+  return Object.entries(groups).map(([condition,g])=>({
+    condition,n:g.n,wins:g.wins,hitRatePercent:Number((100*g.wins/g.n).toFixed(3)),
+    hitRate95CI:wilsonInterval(g.wins,g.n),
+    meanLogLoss:Number((g.logLoss/g.n).toFixed(5)),
+    meanTopProbabilityPercent:Number((100*g.topProb/g.n).toFixed(3)),
+    randomBaselinePercent:10
+  }));
+}
+
 function runBacktest(historyTicks) {
   const digits = historyTicks.map(t => t.digit);
   const modelNames = ["frequency", "recency", "markov1", "markov2", "hierarchical", "ensemble", "uniform"];
@@ -240,6 +285,7 @@ function runBacktest(historyTicks) {
     pipSize: historyTicks[historyTicks.length - 1].pipSize,
     metrics: metrics,
     diagnostics: sequenceDiagnostics(digits),
+    regimes: regimeBacktest(historyTicks),
     barrierStrategies: scoreBarrierStrategies(digits),
     latest: {
       latestObservedDigit: lastWindow[lastWindow.length - 1],
@@ -342,6 +388,7 @@ async function loadHistory() {
     console.log("[history] backtest complete: " + report.predictions + " predictions from " + report.historyTicks + " ticks");
     console.log("[history] model metrics: " + JSON.stringify(report.metrics));
     console.log("[history] sequence diagnostics: " + JSON.stringify(report.diagnostics));
+    console.log("[history] conditional regime results: " + JSON.stringify(report.regimes));
     console.log("[history] barrier strategy results: " + JSON.stringify(report.barrierStrategies));
     historyLoaded = true;
     loading = false;
@@ -439,7 +486,7 @@ app.get("/api/status", (_req, res) => res.json({
   historyRetryCount: historyRetryCount,
   lastHistoryRetryAt: lastHistoryRetryAt,
   historicalTicks: ticks.length,
-  backtest: report ? { predictions: report.predictions, expected: report.expectedPredictions, metrics: report.metrics, diagnostics: report.diagnostics, barrierStrategies: report.barrierStrategies } : null,
+  backtest: report ? { predictions: report.predictions, expected: report.expectedPredictions, metrics: report.metrics, diagnostics: report.diagnostics, regimes: report.regimes, barrierStrategies: report.barrierStrategies } : null,
   liveConnected: liveConnected,
   lastMessageAt: lastMessageAt,
   livePredictions: liveResults.length,
