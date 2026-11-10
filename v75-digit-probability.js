@@ -22,6 +22,8 @@ let livePrediction = null;
 let report = null;
 let latestTick = null;
 let liveTickLogCount = 0;
+let historyRetryCount = 0;
+let lastHistoryRetryAt = null;
 let liveTickCount = 0;
 let liveReconnectCount = 0;
 const liveModelStats = Object.create(null);
@@ -341,12 +343,20 @@ async function loadHistory() {
     console.log("[history] model metrics: " + JSON.stringify(report.metrics));
     historyLoaded = true;
     loading = false;
+    historyRetryCount = 0;
     connectLive();
   } catch (err) {
     loadError = err.message;
     console.error("[history] load failed: " + err.message);
     loading = false;
-    console.error("[history]", err.message);
+    const transient = /429|Unexpected server response|timed out|ECONNRESET|ETIMEDOUT|socket hang up/i.test(err.message);
+    if (transient) {
+      const delay = Math.min(60000, 5000 * Math.pow(2, historyRetryCount));
+      historyRetryCount++;
+      lastHistoryRetryAt = Date.now();
+      console.warn("[history] transient failure; retry " + historyRetryCount + " scheduled in " + delay + "ms");
+      setTimeout(() => { if (!historyLoaded) loadHistory(); }, delay);
+    }
   }
 }
 
@@ -424,6 +434,8 @@ app.get("/api/status", (_req, res) => res.json({
   loading: loading,
   historyLoaded: historyLoaded,
   error: loadError,
+  historyRetryCount: historyRetryCount,
+  lastHistoryRetryAt: lastHistoryRetryAt,
   historicalTicks: ticks.length,
   backtest: report ? { predictions: report.predictions, expected: report.expectedPredictions, metrics: report.metrics, diagnostics: report.diagnostics, barrierStrategies: report.barrierStrategies } : null,
   liveConnected: liveConnected,
