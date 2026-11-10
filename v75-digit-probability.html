@@ -77,7 +77,7 @@ async function refresh(){
    if(p.marketCondition){
     const c=p.marketCondition, q=p.contractProbabilitiesPercent;
     document.getElementById('confidence').textContent='Top digit '+p.probabilityPercent+'% · entropy '+c.entropy+' · latest digit streak '+c.latestDigitStreak+' · transition support '+c.lastDigitTransitionSupport+' · model agreement '+c.modelAgreement+' · '+p.tradePermission;
-    document.getElementById('live').textContent='Live feed: '+(s.liveConnected?'connected':'connecting')+' · scored outcomes: '+s.livePredictions+' · Differs exclude least-frequent digit: '+q.differsExcludeLeastFrequent+'% · Under 8: '+q.under8+'% · Over 1: '+q.over1+'%';
+    const age=s.lastMessageAt?Math.max(0,Math.round((Date.now()-s.lastMessageAt)/1000)):null; const freshness=age===null?'no live tick received':(age<=8?'last tick '+age+'s ago':'STALE — last tick '+age+'s ago'); document.getElementById('live').textContent='Feed: '+(s.liveConnected?'connected':'reconnecting')+' · '+freshness+' · connections: '+s.liveReconnectCount+' · scored outcomes: '+s.livePredictions+' · Differs exclude least-frequent digit: '+q.differsExcludeLeastFrequent+'% · Under 8: '+q.under8+'% · Over 1: '+q.over1+'%';
    }
    document.getElementById('digits').innerHTML=p.probabilitiesPercent.map((v,i)=>'<div class="cell"><div class="digit">'+i+'</div><div class="pct">'+v+'%</div></div>').join('');
    document.getElementById('teststate').textContent='Completed '+s.backtest.predictions+' / '+s.backtest.expected+' predictions';
