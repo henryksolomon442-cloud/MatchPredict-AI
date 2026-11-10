@@ -50,6 +50,11 @@ a{color:#93c5fd}
   <div class="muted">Break-even gross payout: 1.111× stake at 90% wins; 1.25× at 80%; 1.429× at 70%. Deriv quotes include a house-favouring pricing bias, so use the actual quote and a conservative probability estimate.</div>
 </section>
 <section class="panel">
+  <h2>Condition discovery — walk-forward results</h2>
+  <div class="muted">These conditions are measured using only the 100 digits available before each outcome. Compare sample size, hit-rate confidence interval and log loss. A condition is not a trade signal unless it beats its baseline on fresh data.</div>
+  <table><thead><tr><th>Condition</th><th>n</th><th>Hit rate (95% CI)</th><th>Log loss</th></tr></thead><tbody id="regimes"></tbody></table>
+</section>
+<section class="panel">
   <h2>Live forward test — each model</h2>
   <div class="muted" id="liveModels">Waiting for new live outcomes…</div>
   <table><thead><tr><th>Model</th><th>Predictions</th><th>Accuracy</th><th>Log loss</th></tr></thead><tbody id="liveModelRows"></tbody></table>
@@ -75,6 +80,9 @@ async function refresh(){
    if(s.backtest.diagnostics){
     const d=s.backtest.diagnostics;
     document.getElementById('diagnostics').textContent='Ticks: '+d.ticks+' · digit counts 0–9: '+d.digitCounts.join(', ')+' · frequency chi-square p-value: '+d.frequencyPValue+' · 1-step transition-independence p-value: '+d.transitionPValue+' · parity runs z-score: '+d.parityRuns.z;
+   }
+   if(s.backtest.regimes){
+    document.getElementById('regimes').innerHTML=s.backtest.regimes.map(x=>'<tr><td>'+x.condition+'</td><td>'+x.n+'</td><td>'+x.hitRatePercent+'% ('+x.hitRate95CI[0]+'–'+x.hitRate95CI[1]+')</td><td>'+x.meanLogLoss+'</td></tr>').join('');
    }
    if(s.backtest.barrierStrategies){
     document.getElementById('barriers').innerHTML=s.backtest.barrierStrategies.map(x=>'<tr><td>'+x.strategy+'</td><td>'+x.wins+'/'+x.total+'</td><td>'+x.winRatePercent+'%</td></tr>').join('');
