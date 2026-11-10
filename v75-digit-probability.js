@@ -21,6 +21,7 @@ let liveResults = [];
 let livePrediction = null;
 let report = null;
 let latestTick = null;
+let liveTickTrail = [];
 let liveTickLogCount = 0;
 let historyRetryCount = 0;
 let lastHistoryRetryAt = null;
@@ -438,7 +439,9 @@ function connectLive() {
     const last = ticks[ticks.length - 1];
     if (last && epoch === last.epoch && quote === last.quote) return;
     const digit = digitFromPrice(t.quote, pipSize);
-    latestTick = { quote: quote, formattedQuote: quote.toFixed(pipSize), pipSize: pipSize, digit: digit, epoch: epoch };
+    latestTick = { symbol: SYMBOL, quote: quote, formattedQuote: quote.toFixed(pipSize), pipSize: pipSize, digit: digit, epoch: epoch };
+    liveTickTrail.push(latestTick);
+    if (liveTickTrail.length > 25) liveTickTrail.shift();
     if (liveTickLogCount < 10) {
       console.log("[live] verified tick quote=" + latestTick.formattedQuote + " pip_size=" + pipSize + " extracted_digit=" + digit + " epoch=" + epoch);
       liveTickLogCount++;
