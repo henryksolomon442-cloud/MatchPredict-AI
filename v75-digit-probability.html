@@ -74,6 +74,11 @@ async function refresh(){
    const p=await fetch('/api/predict').then(r=>r.json());
    document.getElementById('candidate').textContent=p.predictedDigit;
    document.getElementById('confidence').textContent='Estimated probability '+p.probabilityPercent+'% · latest observed digit '+p.latestObservedDigit;
+   if(p.marketCondition){
+    const c=p.marketCondition, q=p.contractProbabilitiesPercent;
+    document.getElementById('confidence').textContent='Top digit '+p.probabilityPercent+'% · entropy '+c.entropy+' · latest digit streak '+c.latestDigitStreak+' · transition support '+c.lastDigitTransitionSupport+' · model agreement '+c.modelAgreement+' · '+p.tradePermission;
+    document.getElementById('live').textContent='Live feed: '+(s.liveConnected?'connected':'connecting')+' · scored outcomes: '+s.livePredictions+' · Differs exclude least-frequent digit: '+q.differsExcludeLeastFrequent+'% · Under 8: '+q.under8+'% · Over 1: '+q.over1+'%';
+   }
    document.getElementById('digits').innerHTML=p.probabilitiesPercent.map((v,i)=>'<div class="cell"><div class="digit">'+i+'</div><div class="pct">'+v+'%</div></div>').join('');
    document.getElementById('teststate').textContent='Completed '+s.backtest.predictions+' / '+s.backtest.expected+' predictions';
    document.getElementById('metrics').innerHTML=s.backtest.metrics.map(m=>'<tr><td>'+m.model+'</td><td>'+m.accuracyPercent+'%</td><td>'+m.meanLogLoss+'</td><td>'+m.meanTopProbabilityPercent+'%</td></tr>').join('');
