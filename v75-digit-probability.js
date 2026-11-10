@@ -8,7 +8,7 @@ const WS_URL = "wss://api.derivws.com/trading/v1/options/ws/public";
 const WINDOW = 100;
 const TEST_PREDICTIONS = 10000;
 const HISTORY_REQUIRED = WINDOW + TEST_PREDICTIONS;
-const PAGE_SIZE = 5000;
+const PAGE_SIZE = 1000;
 
 let ticks = [];
 let historyLoaded = false;
@@ -216,7 +216,7 @@ async function loadHistory() {
     const pages = [];
     let end = "latest";
     let total = 0;
-    for (let page = 0; page < 6 && total < HISTORY_REQUIRED; page++) {
+    for (let page = 0; page < 15 && total < HISTORY_REQUIRED; page++) {
       const rows = await requestHistoryPage(Math.min(PAGE_SIZE, HISTORY_REQUIRED - total), end);
       if (!rows.length) break;
       pages.push(rows);
