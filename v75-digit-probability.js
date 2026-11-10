@@ -341,6 +341,8 @@ async function loadHistory() {
     report = runBacktest(ticks);
     console.log("[history] backtest complete: " + report.predictions + " predictions from " + report.historyTicks + " ticks");
     console.log("[history] model metrics: " + JSON.stringify(report.metrics));
+    console.log("[history] sequence diagnostics: " + JSON.stringify(report.diagnostics));
+    console.log("[history] barrier strategy results: " + JSON.stringify(report.barrierStrategies));
     historyLoaded = true;
     loading = false;
     historyRetryCount = 0;
