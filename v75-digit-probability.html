@@ -22,6 +22,7 @@ a{color:#93c5fd}
   <h1>V75 Next Digit Probability</h1>
   <div class="muted">R_75 · last 100 digits · one-tick-ahead research</div>
   <p><span class="status" id="state">Starting history test…</span></p>
+  <div class="muted" id="rawtick">Waiting for a live tick with Deriv precision…</div>
   <div class="muted">Current candidate</div>
   <div class="big" id="candidate">—</div>
   <div class="muted" id="confidence">Waiting for 10,100 historical ticks</div>
@@ -48,6 +49,9 @@ async function refresh(){
   state.textContent=s.error?'History error: '+s.error:(s.backtest?'Historical test ready':'Loading '+s.historicalTicks+' ticks');
   state.className='status '+(s.backtest?'good':'warn');
   document.getElementById('live').textContent='Live feed: '+(s.liveConnected?'connected':'connecting')+' · scored live predictions: '+s.livePredictions+' · accuracy: '+(s.liveAccuracy===null?'—':(s.liveAccuracy*100).toFixed(2)+'%');
+  if(s.latestTick){
+   document.getElementById('rawtick').textContent='Latest Deriv quote: '+s.latestTick.formattedQuote+' · pip_size: '+s.latestTick.pipSize+' · extracted final digit: '+s.latestTick.digit+' · epoch: '+s.latestTick.epoch;
+  }
   if(s.backtest){
    const p=await fetch('/api/predict').then(r=>r.json());
    document.getElementById('candidate').textContent=p.predictedDigit;
