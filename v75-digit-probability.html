@@ -41,6 +41,19 @@ a{color:#93c5fd}
   <h2>Live observation</h2>
   <div class="muted" id="live">Waiting for live subscription…</div>
 </section>
+<section class="panel">
+  <h2>Randomness diagnostics</h2>
+  <div class="muted" id="diagnostics">Waiting for historical diagnostics…</div>
+  <h2 style="margin-top:14px">High-hit-rate barrier tests</h2>
+  <div class="muted">Under 8 and Over 1 cover 8 of 10 digits (80% theoretical hit rate under uniform digits). A high hit rate is not automatically profitable.</div>
+  <table><thead><tr><th>Rule</th><th>Wins</th><th>Hit rate</th></tr></thead><tbody id="barriers"></tbody></table>
+  <div class="muted">For an 80% hit rate, gross payout must exceed 1.25× stake just to break even, before any practical execution effects.</div>
+</section>
+<section class="panel">
+  <h2>Live forward test — each model</h2>
+  <div class="muted" id="liveModels">Waiting for new live outcomes…</div>
+  <table><thead><tr><th>Model</th><th>Predictions</th><th>Accuracy</th><th>Log loss</th></tr></thead><tbody id="liveModelRows"></tbody></table>
+</section>
 <script>
 async function refresh(){
  try{
@@ -59,6 +72,18 @@ async function refresh(){
    document.getElementById('digits').innerHTML=p.probabilitiesPercent.map((v,i)=>'<div class="cell"><div class="digit">'+i+'</div><div class="pct">'+v+'%</div></div>').join('');
    document.getElementById('teststate').textContent='Completed '+s.backtest.predictions+' / '+s.backtest.expected+' predictions';
    document.getElementById('metrics').innerHTML=s.backtest.metrics.map(m=>'<tr><td>'+m.model+'</td><td>'+m.accuracyPercent+'%</td><td>'+m.meanLogLoss+'</td><td>'+m.meanTopProbabilityPercent+'%</td></tr>').join('');
+   if(s.backtest.diagnostics){
+    const d=s.backtest.diagnostics;
+    document.getElementById('diagnostics').textContent='Ticks: '+d.ticks+' · digit counts 0–9: '+d.digitCounts.join(', ')+' · frequency chi-square p-value: '+d.frequencyPValue+' · 1-step transition-independence p-value: '+d.transitionPValue+' · parity runs z-score: '+d.parityRuns.z;
+   }
+   if(s.backtest.barrierStrategies){
+    document.getElementById('barriers').innerHTML=s.backtest.barrierStrategies.map(x=>'<tr><td>'+x.strategy+'</td><td>'+x.wins+'/'+x.total+'</td><td>'+x.winRatePercent+'%</td></tr>').join('');
+   }
+   if(s.liveModelStats){
+    const entries=Object.entries(s.liveModelStats);
+    document.getElementById('liveModels').textContent='Scored new ticks: '+s.liveTickCount+' · WebSocket connections: '+s.liveReconnectCount+' · these scores are forward-only since this process started.';
+    document.getElementById('liveModelRows').innerHTML=entries.map(([name,x])=>'<tr><td>'+name+'</td><td>'+x.predictions+'</td><td>'+x.accuracyPercent+'%</td><td>'+x.meanLogLoss+'</td></tr>').join('');
+   }
   }
  }catch(e){document.getElementById('state').textContent='Cannot reach service';}
 }
