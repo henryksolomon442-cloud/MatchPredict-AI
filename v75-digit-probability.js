@@ -498,6 +498,7 @@ app.get("/api/status", (_req, res) => res.json({
   liveModelStats: Object.fromEntries(Object.entries(liveModelStats).map(([name,v])=>[name,{predictions:v.n,accuracyPercent:Number((v.correct/v.n*100).toFixed(3)),meanLogLoss:Number((v.logLoss/v.n).toFixed(5)),meanBrier:Number((v.brier/v.n).toFixed(5))}])),
   liveAccuracy: liveResults.length ? liveResults.filter(x => x.correct).length / liveResults.length : null,
   latestTick: latestTick,
+  liveTickTrail: liveTickTrail,
   latestLivePrediction: livePrediction
 }));
 app.get("/api/report", (_req, res) => {
