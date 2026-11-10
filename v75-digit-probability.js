@@ -240,7 +240,7 @@ function wilsonInterval(wins,n) {
 }
 function regimeBacktest(historyTicks) {
   const digits=historyTicks.map(t=>t.digit), groups={};
-  const add=(key,hit,prob)=>{const g=groups[key]||(groups[key]={n:0,wins:0,logLoss:0,topProb:0});g.n++;if(hit)g.wins++;g.logLoss-=Math.log(Math.max(1e-12,prob));g.topProb+=prob;};
+  const add=(key,hit,actualProb,topProb)=>{const g=groups[key]||(groups[key]={n:0,wins:0,logLoss:0,topProb:0});g.n++;if(hit)g.wins++;g.logLoss-=Math.log(Math.max(1e-12,actualProb));g.topProb+=topProb;};
   for(let i=WINDOW;i<digits.length;i++){
     const w=digits.slice(i-WINDOW,i), p=probabilities(w), actual=digits[i], feat=regimeFeatures(w,p);
     const candidate=argmax(p.ensemble), hit=candidate===actual;
@@ -250,7 +250,7 @@ function regimeBacktest(historyTicks) {
     const streakBand=feat.lastDigitStreak>=2?"same-digit streak >=2":"no repeat streak";
     const supportBand=feat.lastDigitTransitionSupport<5?"transition support <5":"transition support >=5";
     const agreementBand=feat.modelAgreement>=4?"model agreement >=4/5":"model agreement <4/5";
-    for(const [name,key] of [["confidence",confidenceBand],["entropy",entropyBand],["streak",streakBand],["transition support",supportBand],["model agreement",agreementBand]])add(name+" | "+key,hit,p.ensemble[actual]);
+    for(const [name,key] of [["confidence",confidenceBand],["entropy",entropyBand],["streak",streakBand],["transition support",supportBand],["model agreement",agreementBand]])add(name+" | "+key,hit,p.ensemble[actual],feat.topModelProbability);
   }
   return Object.entries(groups).map(([condition,g])=>({
     condition,n:g.n,wins:g.wins,hitRatePercent:Number((100*g.wins/g.n).toFixed(3)),
@@ -503,7 +503,16 @@ app.get("/api/report", (_req, res) => {
 });
 app.get("/api/predict", (_req, res) => {
   if (ticks.length < WINDOW) return res.status(503).json({ ready: false });
-  const p = probabilities(ticks.slice(-WINDOW).map(x => x.digit));
+  const recentDigits=ticks.slice(-WINDOW).map(x => x.digit);
+  const p = probabilities(recentDigits);
+  const features=regimeFeatures(recentDigits,p);
+  const counts=Array(10).fill(0);for(const d of recentDigits)counts[d]++;
+  let leastFrequentDigit=0;for(let d=1;d<10;d++)if(counts[d]<counts[leastFrequentDigit])leastFrequentDigit=d;
+  const contractProbabilities={
+    differsExcludeLeastFrequent:Number(((1-p.ensemble[leastFrequentDigit])*100).toFixed(3)),
+    under8:Number((p.ensemble.slice(0,8).reduce((a,b)=>a+b,0)*100).toFixed(3)),
+    over1:Number((p.ensemble.slice(2).reduce((a,b)=>a+b,0)*100).toFixed(3))
+  };
   res.json({
     symbol: SYMBOL,
     window: WINDOW,
@@ -511,6 +520,16 @@ app.get("/api/predict", (_req, res) => {
     predictedDigit: argmax(p.ensemble),
     probabilityPercent: Number((Math.max(...p.ensemble) * 100).toFixed(3)),
     probabilitiesPercent: p.ensemble.map(v => Number((v * 100).toFixed(3))),
+    marketCondition: {
+      entropy: Number(features.entropy.toFixed(4)),
+      topDigitFrequencyPercent: Number((features.topFrequency*100).toFixed(2)),
+      latestDigitStreak: features.lastDigitStreak,
+      lastDigitTransitionSupport: features.lastDigitTransitionSupport,
+      modelAgreement: features.modelAgreement + "/5",
+      topModelProbabilityPercent: Number((features.topModelProbability*100).toFixed(3))
+    },
+    contractProbabilitiesPercent: contractProbabilities,
+    tradePermission: "NO_EDGE_ESTABLISHED — observation only",
     context: p.context
   });
 });
