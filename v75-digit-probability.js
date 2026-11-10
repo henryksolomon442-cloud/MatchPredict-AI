@@ -58,7 +58,6 @@ function probabilities(windowDigits) {
       trans1Total++;
     }
   }
-  const markov1 = normalizeProb(trans1.map(c => c + 5 * freq[c === -1 ? 0 : trans1.indexOf(c)]));
   // Rebuild the first-order posterior by digit index; shrink sparse contexts toward frequency.
   const m1 = normalizeProb(trans1.map((c, j) => c + 5 * freq[j]));
 
