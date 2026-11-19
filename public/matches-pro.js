@@ -40,16 +40,16 @@
     const check1 = pctTarget >= 11;
 
     let belowCount = 0;
-    cfg.below10.forEach(d => { if (pct(last100, d) < 10) belowCount++; });
-    const needBelow = cfg.minBelow || cfg.below10.length;
+    cfg.below10.forEach(d => { if (pct(last100, d) <= 11) belowCount++; });
+    const needBelow = 2;
     const check2 = belowCount >= needBelow;
 
     const pctTarget20 = pct(last20, target);
-    const check3 = Math.abs(pctTarget20 - pctTarget) < 1.0;
+    const check3 = Math.abs(pctTarget20 - pctTarget) <= 2.5;
 
     let check4 = true;
     cfg.watch.forEach(d => {
-      if (Math.abs(pct(last20, d) - pct(last100, d)) > 1.5) check4 = false;
+      if (Math.abs(pct(last20, d) - pct(last100, d)) > 3.0) check4 = false;
     });
     // Entry timing: accept the configured entry digit if it appeared in the latest 3 ticks.
     const last3 = digits.slice(-3);
@@ -65,8 +65,8 @@
       pctTarget:pctTarget.toFixed(1), belowCount, needBelow,
       checks,
       reason: confirmed
-        ? `CONFIRMED Matches ${target} | Strength PASS | ${score}/5 checks | Entry ${cfg.entry} seen in last 3 ticks`
-        : `NOT CONFIRMED Matches ${target} | ${score}/5 checks | Strength:${check1?"PASS":"FAIL"} Below10:${check2?"PASS":"FAIL"} Neutral:${check3?"PASS":"FAIL"} Stable:${check4?"PASS":"FAIL"} EntryNear:${check5?"PASS":"FAIL"} | Need strength + 2 checks`
+        ? `CONFIRMED Matches ${target} | Strength PASS | ${score}/5 checks | EntryNear PASS (${cfg.entry} seen in last 3 ticks)`
+        : `NOT CONFIRMED Matches ${target} | ${score}/5 checks | Strength:${check1?"PASS":"FAIL"} Below10:${check2?"PASS":"FAIL"} Neutral:${check3?"PASS":"FAIL"} Stable:${check4?"PASS":"FAIL"} EntryNear:${check5?"PASS":"FAIL"} | Need strength + 2 checks; limits: below<=11%, neutral<=2.5pp, stable<=3pp`
     };
   }
 
