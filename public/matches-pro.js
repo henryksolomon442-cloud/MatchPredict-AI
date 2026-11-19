@@ -32,8 +32,8 @@
       else if (typeof oldPrediction.label === "string") oldPrediction = oldPrediction.label;
     }
     if (target === null && typeof oldPrediction === "string") {
-      const matchLabel = oldPrediction.match(/\\bMATCH(?:ES)?\\s*[:#-]?\\s*([0-9])\\b/i);
-      const bareDigit = oldPrediction.match(/^\\s*([0-9])\\s*$/);
+      const matchLabel = oldPrediction.match(/\bMATCH(?:ES)?\s*[:#-]?\s*([0-9])\b/i);
+      const bareDigit = oldPrediction.match(/^\s*([0-9])\s*$/);
       const match = matchLabel || bareDigit;
       if (match) target = Number.parseInt(match[1], 10);
     }
