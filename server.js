@@ -152,12 +152,8 @@ app.get("/api/auth/status",async(req,res)=>{
 app.post("/api/sync/digitedge",async(req,res)=>{
   const syncStartedAt=Date.now();
   try{
-    // Only an authenticated DigitEdge session may forward a prediction.
-    const auth=req.session?.deriv;
-    if(!auth?.accessToken || (auth.expiresAt && Date.now()>=auth.expiresAt)){
-      req.session.deriv=null;
-      return res.status(401).json({ok:false,reason:"DERIV_LOGIN_REQUIRED",message:"Connect your Deriv account in DigitEdge first."});
-    }
+    // Signal forwarding is independent of Deriv login.
+    // Deriv authentication belongs to the trade-execution step, not signal delivery.
     let target=String(process.env.MATCHSYNC_URL||"");
     while(target.endsWith("/")) target=target.slice(0,-1);
     const key=String(process.env.MATCHSYNC_SYNC_KEY||"");
