@@ -65,8 +65,8 @@
       pctTarget:pctTarget.toFixed(1), belowCount, needBelow,
       checks,
       reason: confirmed
-        ? `CONFIRMED Matches ${target} | ${pctTarget.toFixed(1)}% | Below10 ${belowCount}/${cfg.below10.length} | Neutral OK | Watch Stable | Entry ${current}==${cfg.entry}`
-        : `NOT CONFIRMED Matches ${target} | ${score}/5 checks | Strength:${check1?"PASS":"FAIL"} Below10:${check2?"PASS":"FAIL"} Neutral:${check3?"PASS":"FAIL"} Stable:${check4?"PASS":"FAIL"} Entry:${check5?"PASS":"FAIL"} (need ${cfg.entry}, current ${current})`
+        ? `CONFIRMED Matches ${target} | Strength PASS | ${score}/5 checks | Entry ${cfg.entry} seen in last 3 ticks`
+        : `NOT CONFIRMED Matches ${target} | ${score}/5 checks | Strength:${check1?"PASS":"FAIL"} Below10:${check2?"PASS":"FAIL"} Neutral:${check3?"PASS":"FAIL"} Stable:${check4?"PASS":"FAIL"} EntryNear:${check5?"PASS":"FAIL"} | Need strength + 2 checks`
     };
   }
 
