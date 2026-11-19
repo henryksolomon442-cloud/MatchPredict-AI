@@ -23,7 +23,7 @@
     if (!oldPrediction || !String(oldPrediction).startsWith("Matches")) {
       return { confirmed:false, score:0, reason:"Not a Matches prediction" };
     }
-    const target = Number.parseInt(String(oldPrediction).split(/\\s+/)[1], 10);
+    const target = Number.parseInt(String(oldPrediction).split(/\s+/)[1], 10);
     if (!Number.isInteger(target) || target < 0 || target > 9) {
       return { confirmed:false, score:0, reason:"Invalid Matches digit" };
     }
