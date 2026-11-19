@@ -248,16 +248,23 @@ app.post("/api/ingest-signal", async (req, res) => {
 
   const agreement = Number(body.agreement ?? body.modelAgreement ?? body.agreementCount);
   const signalLevel = Number(body.signalLevel);
+  // Matches Pro is the authoritative confirmation gate when an authenticated
+  // DigitEdge proxy explicitly forwards confirmed:true. Keep legacy qualification
+  // only for older senders that do not provide the confirmation field.
+  const explicitlyConfirmed = body.confirmed === true;
   const qualifiesFour = agreement === 4;
   const qualifiesThree = agreement === 3 && Number.isFinite(signalLevel) && signalLevel >= 90;
-  if (!qualifiesFour && !qualifiesThree)
+  if (!explicitlyConfirmed && !qualifiesFour && !qualifiesThree)
     return res.status(422).json({
       ok: false,
       accepted: false,
       reason: "UNQUALIFIED_SIGNAL",
-      message: "Only 4/4 agreement or 3/4 agreement with model level >= 90 may enter the execution pipeline.",
+      message: "Signal needs Matches Pro confirmed:true, or legacy 4/4 / 3/4 with model level >= 90.",
+      confirmed: explicitlyConfirmed,
       agreement: Number.isFinite(agreement) ? agreement : null,
-      signalLevel: Number.isFinite(signalLevel) ? signalLevel : null
+      signalLevel: Number.isFinite(signalLevel) ? signalLevel : null,
+      confirmationScore: Number.isFinite(Number(body.confirmationScore)) ? Number(body.confirmationScore) : null,
+      confirmationReason: typeof body.confirmationReason === "string" ? body.confirmationReason.slice(0, 160) : null
     });
 
   if (!symbols.includes(symbol))
@@ -283,6 +290,10 @@ app.post("/api/ingest-signal", async (req, res) => {
     symbol, volatility: symbol, matchDigit, evenOdd,
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
     agreement,
+    confirmed: explicitlyConfirmed,
+    confirmationScore: Number.isFinite(Number(body.confirmationScore)) ? Number(body.confirmationScore) : null,
+    confirmationReason: typeof body.confirmationReason === "string" ? body.confirmationReason.slice(0, 160) : null,
+    confirmationChecks: body.confirmationChecks && typeof body.confirmationChecks === "object" ? body.confirmationChecks : null,
     signalLevel: Number.isFinite(signalLevel) ? Math.max(0, Math.min(100, signalLevel)) : null,
     signalReason: typeof body.signalReason === "string" ? body.signalReason.slice(0, 80) : null,
     createdAt: now, receivedAt: now, sourceGeneratedAt: generatedAt,
