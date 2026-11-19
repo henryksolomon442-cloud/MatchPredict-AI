@@ -442,6 +442,7 @@ select:focus,input:focus{border-color:#7d5b19}
   </div>
 </main>
 
+<script src="/matches-pro.js"></script>
 <script>
 
 const perMarket = new Map();
@@ -751,20 +752,25 @@ function finishLiveScanWithLockedSignal(s,candidate,level,reason="threshold"){
   if(!s?.liveScan)return;
   if(s.liveScan.timeoutId) clearTimeout(s.liveScan.timeoutId);
 
+  // Confirmation-only layer: the existing DigitEdge prediction remains unchanged.
+  const confirmation=window.MATCHES_PRO_CONFIRM?.confirmMatches(`Matches ${candidate}`,s.ticks)
+    || {confirmed:false,score:0,reason:"Matches Pro module unavailable"};
   s.liveSignal={
     pred:candidate,
     level,
     qualified:true,
     locked:true,
     reason,
+    confirmation,
     time:new Date().toLocaleTimeString(),
     generatedAt:Date.now(),
     sourceId:`${s.symbol}-${Date.now()}-${Math.random().toString(36).slice(2,10)}`,
-    syncStatus:"SENDING"
+    syncStatus:confirmation.confirmed?"SENDING":"NOT_CONFIRMED"
   };
   s.liveScan=null;
   renderMarketMatrix();
-  syncLockedDigitEdgeSignal(s,candidate,level);
+  // MatchSync is gated: only a complete 5/5 Matches Pro confirmation can pass.
+  if(confirmation.confirmed) syncLockedDigitEdgeSignal(s,candidate,level);
 }
 
 function finishLiveScanWithoutSignal(s){
@@ -914,7 +920,7 @@ function renderLiveSignalPanel(s){
 
   if(s.liveSignal?.locked){
     const level=Math.max(90,Math.min(100,s.liveSignal.level||90));
-    const syncLabels={SENDING:"SENDING TO MATCHSYNC…",ORDER_CONFIRMED:"DERIV ORDER CONFIRMED",EXECUTION_BLOCKED:"SIGNAL RECEIVED · EXECUTION BLOCKED",SIGNAL_ACCEPTED:"SIGNAL RECEIVED",LOGIN_REQUIRED:"CONNECT DERIV IN DIGITEDGE",SYNC_REJECTED:"SIGNAL REJECTED",SYNC_FAILED:"SYNC CONNECTION FAILED"};
+    const syncLabels={NOT_CONFIRMED:"BLOCKED BY MATCHES PRO · NO SIGNAL SENT",SENDING:"SENDING TO MATCHSYNC…",ORDER_CONFIRMED:"DERIV ORDER CONFIRMED",EXECUTION_BLOCKED:"SIGNAL RECEIVED · EXECUTION BLOCKED",SIGNAL_ACCEPTED:"SIGNAL RECEIVED",LOGIN_REQUIRED:"CONNECT DERIV IN DIGITEDGE",SYNC_REJECTED:"SIGNAL REJECTED",SYNC_FAILED:"SYNC CONNECTION FAILED"};
     const syncLabel=syncLabels[s.liveSignal.syncStatus]||"SYNC PENDING";
     return `<div class="live-scan-panel">
       <div class="live-scan-top">
@@ -929,7 +935,8 @@ function renderLiveSignalPanel(s){
           <div class="live-signal-sub">
             90–100% qualification reached · result frozen at ${s.liveSignal.time}
           </div>
-          <div class="live-signal-sub" style="margin-top:7px;font-weight:900;color:#ffd05b">DigitEdge sync: ${syncLabel}</div>
+          <div class="live-signal-sub" style="margin-top:7px;font-weight:900;color:${s.liveSignal.confirmation?.confirmed?"#63e6a8":"#ff8893"}">Matches Pro: ${s.liveSignal.confirmation?.reason||"Confirmation unavailable"}</div>
+          <div class="live-signal-sub" style="margin-top:7px;font-weight:900;color:#ffd05b">DigitEdge / MatchSync: ${syncLabel}</div>
           <div class="live-level-track">
             <div class="live-level-fill" style="width:${level}%"></div>
           </div>
