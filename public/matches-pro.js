@@ -20,13 +20,29 @@
   }
 
   function confirmMatches(oldPrediction, digits) {
-    if (!oldPrediction || !String(oldPrediction).startsWith("Matches")) {
-      return { confirmed:false, score:0, reason:"Not a Matches prediction" };
+    // Accept a digit, a Matches label, or a prediction object without
+    // accidentally reading a version number or unrelated digit in the text.
+    let target = null;
+    if (typeof oldPrediction === "number") {
+      target = oldPrediction;
+    } else if (oldPrediction && typeof oldPrediction === "object") {
+      if (Number.isInteger(oldPrediction.target)) target = oldPrediction.target;
+      else if (Number.isInteger(oldPrediction.digit)) target = oldPrediction.digit;
+      else if (typeof oldPrediction.prediction === "string") oldPrediction = oldPrediction.prediction;
+      else if (typeof oldPrediction.label === "string") oldPrediction = oldPrediction.label;
     }
-
-    const target = Number.parseInt(String(oldPrediction).split(/\\s+/)[1], 10);
+    if (target === null && typeof oldPrediction === "string") {
+      const matchLabel = oldPrediction.match(/\\bMATCH(?:ES)?\\s*[:#-]?\\s*([0-9])\\b/i);
+      const bareDigit = oldPrediction.match(/^\\s*([0-9])\\s*$/);
+      const match = matchLabel || bareDigit;
+      if (match) target = Number.parseInt(match[1], 10);
+    }
     if (!Number.isInteger(target) || target < 0 || target > 9) {
-      return { confirmed:false, score:0, reason:"Invalid Matches digit" };
+      return {
+        confirmed: false,
+        score: 0,
+        reason: `Matches Pro: Invalid Matches digit — received "${String(oldPrediction)}"`
+      };
     }
 
     if (!Array.isArray(digits) || digits.length < 100 ||
