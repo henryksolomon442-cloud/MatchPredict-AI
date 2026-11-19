@@ -743,7 +743,9 @@ async function syncLockedDigitEdgeSignal(s,candidate,level){
     if(response.ok && result.accepted){
       s.liveSignal.syncDetail="";
       const executions=[result.execution?.demo,result.execution?.real].filter(Boolean);
+      const executionReasons=executions.map(x=>String(x.reason||"")).join(" ");
       if(executions.some(x=>x.ok===true || x.status==="ORDER_CONFIRMED"))s.liveSignal.syncStatus="ORDER_CONFIRMED";
+      else if(/DERIV_LOGIN_REQUIRED|LOGIN_REQUIRED|AUTH_REQUIRED/i.test(executionReasons))s.liveSignal.syncStatus="SIGNAL_ACCEPTED_LOGIN_REQUIRED";
       else if(executions.some(x=>x.status==="blocked" || x.status==="execution_error" || x.ok===false))s.liveSignal.syncStatus="EXECUTION_BLOCKED";
       else s.liveSignal.syncStatus="SIGNAL_ACCEPTED";
     }else if(result.reason==="DERIV_LOGIN_REQUIRED" || response.status===401){
@@ -932,7 +934,7 @@ function renderLiveSignalPanel(s){
 
   if(s.liveSignal?.locked){
     const level=Math.max(90,Math.min(100,s.liveSignal.level||90));
-    const syncLabels={NOT_CONFIRMED:"BLOCKED BY MATCHES PRO · NO SIGNAL SENT",SENDING:"SENDING TO MATCHSYNC…",ORDER_CONFIRMED:"DERIV ORDER CONFIRMED",EXECUTION_BLOCKED:"SIGNAL RECEIVED · EXECUTION BLOCKED",SIGNAL_ACCEPTED:"SIGNAL RECEIVED",LOGIN_REQUIRED:"CONNECT DERIV IN DIGITEDGE",SYNC_REJECTED:"SIGNAL REJECTED",SYNC_FAILED:"SYNC CONNECTION FAILED"};
+    const syncLabels={NOT_CONFIRMED:"BLOCKED BY MATCHES PRO · NO SIGNAL SENT",SENDING:"SENDING TO MATCHSYNC…",ORDER_CONFIRMED:"SIGNAL SENT · DERIV ORDER CONFIRMED",EXECUTION_BLOCKED:"SIGNAL SENT · TRADE NOT PLACED",SIGNAL_ACCEPTED:"SIGNAL SENT",SIGNAL_ACCEPTED_LOGIN_REQUIRED:"SIGNAL SENT",LOGIN_REQUIRED:"CONNECT DERIV TO SEND SIGNAL",SYNC_REJECTED:"SIGNAL REJECTED",SYNC_FAILED:"SYNC CONNECTION FAILED"};
     const syncLabel=syncLabels[s.liveSignal.syncStatus]||"SYNC PENDING";
     return `<div class="live-scan-panel">
       <div class="live-scan-top">
@@ -948,7 +950,8 @@ function renderLiveSignalPanel(s){
             90–100% qualification reached · result frozen at ${s.liveSignal.time}
           </div>
           <div class="live-signal-sub" style="margin-top:7px;font-weight:900;color:${s.liveSignal.confirmation?.confirmed?"#63e6a8":"#ff8893"}">Matches Pro: ${s.liveSignal.confirmation?.reason||"Confirmation unavailable"}</div>
-          <div class="live-signal-sub" style="margin-top:7px;font-weight:900;color:#ffd05b">DigitEdge / MatchSync: ${syncLabel}</div>
+          <div class="live-signal-sub" style="margin-top:7px;font-weight:900;color:${s.liveSignal.syncStatus==="SIGNAL_ACCEPTED"||s.liveSignal.syncStatus==="SIGNAL_ACCEPTED_LOGIN_REQUIRED"||s.liveSignal.syncStatus==="ORDER_CONFIRMED"||s.liveSignal.syncStatus==="EXECUTION_BLOCKED"?"#22c55e":"#ffd05b"}">DigitEdge / MatchSync: ${syncLabel}</div>
+          ${s.liveSignal.syncStatus==="SIGNAL_ACCEPTED_LOGIN_REQUIRED"||s.liveSignal.syncStatus==="EXECUTION_BLOCKED"?'<div class="live-signal-sub" style="margin-top:5px;color:#facc15">Signal is sent — connect Deriv to place this MATCH '+s.liveSignal.pred+' trade.</div>':''}
           ${s.liveSignal.syncDetail?'<div class="live-signal-sub" style="margin-top:5px;color:#ffb4a8">Reason: '+s.liveSignal.syncDetail+'</div>':''}
           <div class="live-level-track">
             <div class="live-level-fill" style="width:${level}%"></div>
