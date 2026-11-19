@@ -51,10 +51,14 @@
     cfg.watch.forEach(d => {
       if (Math.abs(pct(last20, d) - pct(last100, d)) > 1.5) check4 = false;
     });
-    const check5 = current === cfg.entry;
+    // Entry timing: accept the configured entry digit if it appeared in the latest 3 ticks.
+    const last3 = digits.slice(-3);
+    const check5 = last3.includes(cfg.entry);
     const checks = { check1, check2, check3, check4, check5 };
     const score = Object.values(checks).filter(Boolean).length;
-    const confirmed = score === 5;
+
+    // Strength is mandatory; any two of the remaining four checks must also pass.
+    const confirmed = check1 && score >= 3;
 
     return {
       confirmed, score, target, entry:cfg.entry, current,
