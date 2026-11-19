@@ -189,6 +189,10 @@ app.post("/api/sync/digitedge",async(req,res)=>{
         symbol,matchDigit,evenOdd,generatedAt,sourceId,
         signalLevel:Number.isFinite(Number(b.signalLevel))?Number(b.signalLevel):null,
         agreement:Number.isInteger(Number(b.agreement))?Number(b.agreement):null,
+        confirmed:b.confirmed===true,
+        confirmationScore:Number.isFinite(Number(b.confirmationScore))?Number(b.confirmationScore):null,
+        confirmationReason:typeof b.confirmationReason==="string"?b.confirmationReason.slice(0,160):null,
+        confirmationChecks:b.confirmationChecks&&typeof b.confirmationChecks==="object"?b.confirmationChecks:null,
         signalReason:typeof b.signalReason==="string"?b.signalReason.slice(0,80):null
       })
     });
