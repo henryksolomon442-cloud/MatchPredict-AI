@@ -722,6 +722,10 @@ async function syncLockedDigitEdgeSignal(s,candidate,level){
     sourceId:s.liveSignal.sourceId,
     signalLevel:level,
     agreement:Number.isInteger(s.analysis?.agreement)?s.analysis.agreement:null,
+    confirmed:s.liveSignal.confirmation?.confirmed===true,
+    confirmationScore:Number.isFinite(Number(s.liveSignal.confirmation?.score))?Number(s.liveSignal.confirmation.score):null,
+    confirmationReason:typeof s.liveSignal.confirmation?.reason==="string"?s.liveSignal.confirmation.reason.slice(0,160):"",
+    confirmationChecks:s.liveSignal.confirmation?.checks && typeof s.liveSignal.confirmation.checks==="object"?s.liveSignal.confirmation.checks:null,
     signalReason:typeof s.liveSignal.reason==="string"?s.liveSignal.reason:""
   };
   try{
