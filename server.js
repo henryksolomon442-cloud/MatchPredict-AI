@@ -183,6 +183,7 @@ app.post("/api/sync/digitedge",async(req,res)=>{
       headers:{"Content-Type":"application/json","x-sync-key":key},
       body:JSON.stringify({
         symbol,matchDigit,evenOdd,generatedAt,sourceId,
+        signalOnly:true,
         signalLevel:Number.isFinite(Number(b.signalLevel))?Number(b.signalLevel):null,
         agreement:Number.isInteger(Number(b.agreement))?Number(b.agreement):null,
         confirmed:b.confirmed===true,
