@@ -1,4 +1,4 @@
-// MATCHES PRO V3 — confirmation only. Does not generate or alter predictions.
+// MATCHES PRO V4 — core checks gate confirmation; other checks are informational only. Does not generate or alter predictions.
 (function (root) {
   "use strict";
   const MATCH_CIRCLE_CONFIRM = {
@@ -90,7 +90,7 @@
     const score = Object.values(checks).filter(Boolean).length;
 
     // V3 gate: Strength + Below10 are mandatory, plus at least one other check.
-    const confirmed = check1 && check2 && score >= 3;
+    const confirmed = check1 && check2;
 
     return {
       confirmed,
@@ -109,8 +109,8 @@
       },
       checks,
       reason: confirmed
-        ? `CONFIRMED Matches ${target} | ${pctTarget.toFixed(1)}% main | ${score}/5 checks | windows ${last300.length}/${last50.length}/${last10.length}`
-        : `NOT CONFIRMED Matches ${target} (${pctTarget.toFixed(1)}%) | ${score}/5 checks | Strength:${check1?"PASS":"FAIL"} Below10:${check2?"PASS":"FAIL"} Neutral:${check3?"PASS":"FAIL"} Stable:${check4?"PASS":"FAIL"} EntryNear(10):${check5?"PASS":"FAIL"} | Need Strength + Below10 + 1 more; entry digit ${cfg.entry}; windows ${last300.length}/${last50.length}/${last10.length}`
+        ? `CONFIRMED Matches ${target} | ${pctTarget.toFixed(1)}% | Core 2/2 PASS | Info ${score}/5`
+        : `NOT CONFIRMED Matches ${target} (${pctTarget.toFixed(1)}%) | Need Strength >=11% + Below10 | Strength:${check1?"PASS":"FAIL"} Below10:${check2?"PASS":"FAIL"} | Info: Neutral:${check3?"PASS":"FAIL"} Stable:${check4?"PASS":"FAIL"} Entry:${check5?"PASS":"FAIL"}`
     };
   }
 
