@@ -737,17 +737,21 @@ async function syncLockedDigitEdgeSignal(s,candidate,level){
     });
     const result=await response.json().catch(()=>({}));
     if(response.ok && result.accepted){
+      s.liveSignal.syncDetail="";
       const executions=[result.execution?.demo,result.execution?.real].filter(Boolean);
       if(executions.some(x=>x.ok===true || x.status==="ORDER_CONFIRMED"))s.liveSignal.syncStatus="ORDER_CONFIRMED";
       else if(executions.some(x=>x.status==="blocked" || x.status==="execution_error" || x.ok===false))s.liveSignal.syncStatus="EXECUTION_BLOCKED";
       else s.liveSignal.syncStatus="SIGNAL_ACCEPTED";
     }else if(result.reason==="DERIV_LOGIN_REQUIRED" || response.status===401){
       s.liveSignal.syncStatus="LOGIN_REQUIRED";
+      s.liveSignal.syncDetail=`HTTP ${response.status} · ${String(result.reason||"DERIV_LOGIN_REQUIRED").slice(0,80)}`;
     }else{
       s.liveSignal.syncStatus="SYNC_REJECTED";
+      s.liveSignal.syncDetail=`HTTP ${response.status} · ${String(result.reason||"UNKNOWN_REJECTION").slice(0,80)}`;
     }
-  }catch{
+  }catch(error){
     s.liveSignal.syncStatus="SYNC_FAILED";
+    s.liveSignal.syncDetail=String(error?.message||"NETWORK_ERROR").slice(0,100);
   }
   renderMarketMatrix();
 }
@@ -941,6 +945,7 @@ function renderLiveSignalPanel(s){
           </div>
           <div class="live-signal-sub" style="margin-top:7px;font-weight:900;color:${s.liveSignal.confirmation?.confirmed?"#63e6a8":"#ff8893"}">Matches Pro: ${s.liveSignal.confirmation?.reason||"Confirmation unavailable"}</div>
           <div class="live-signal-sub" style="margin-top:7px;font-weight:900;color:#ffd05b">DigitEdge / MatchSync: ${syncLabel}</div>
+          ${s.liveSignal.syncDetail?'<div class="live-signal-sub" style="margin-top:5px;color:#ffb4a8">Reason: '+s.liveSignal.syncDetail+'</div>':''}
           <div class="live-level-track">
             <div class="live-level-fill" style="width:${level}%"></div>
           </div>
